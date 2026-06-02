@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Pendências por equipe — {{ municipio }}{% endblock %}
+{% block content %}
+  <a class="voltar" href="/municipio/{{ ibge }}">&larr; Voltar ao município</a>
+  <h2>Pendências por equipe · {{ municipio }}</h2>
+  <p>
+    Para cada equipe e indicador: quantos pacientes faltam para <strong>bater a meta</strong>
+    e a <strong>lista nominal</strong> de quem acionar. Esta é a tradução do recurso
+    "na mesa" em <strong>ação operacional no nível de paciente</strong>.
+  </p>
+  <p style="background:#fff5d6;border:1px solid #f2c200;border-radius:8px;padding:10px 14px;font-size:.9rem">
+    ⚠️ <strong>Demonstração com amostra sintética</strong> (sem dados reais / sem PII).
+    Em produção, alimente com extratos individualizados autorizados via convênio
+    com o DataSUS — ver <code>previne/convenio.py</code> (pseudonimização + LGPD).
+  </p>
+
+  <p style="margin:16px 0">
+    <a class="botao" href="/api/equipes/{{ ibge }}/export.csv"
+       style="display:inline-block;background:var(--azul);color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:600;margin-right:8px">⬇ Baixar CSV</a>
+    <a class="botao" href="/api/equipes/{{ ibge }}/export.pdf"
+       style="display:inline-block;background:var(--verde);color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:600">⬇ Baixar PDF</a>
+  </p>
+
+  {% for equipe, pendencias in por_equipe.items() %}
+  <h3>{{ equipe }}</h3>
+  <table style="margin-bottom:24px">
+    <thead>
+      <tr>
+        <th>Indicador</th>
+        <th class="num">Cobertura</th>
+        <th class="num">Meta</th>
+        <th class="num">Faltam</th>
+        <th>Instrução / pacientes a acionar</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in pendencias %}
+      <tr>
+        <td>{{ p.indicador_nome }}</td>
+        <td class="num">{{ p.atendidos }}/{{ p.elegiveis }} ({{ "%.0f"|format(p.cobertura) }}%)</td>
+        <td class="num">{{ "%.0f"|format(p.meta) }}%</td>
+        <td class="num">
+          {% if p.faltam_para_meta > 0 %}
+            <span class="destaque">+{{ p.faltam_para_meta }}</span>
+          {% else %}
+            <span class="pill ok">ok</span>
+          {% endif %}
+        </td>
+        <td style="font-size:.88rem">
+          {% if p.faltam_para_meta > 0 %}
+            Acionar: {{ p.pacientes_pendentes[:p.faltam_para_meta] | join(", ") }}
+          {% else %}
+            Meta atingida — manter acompanhamento.
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endfor %}
+{% endblock %}

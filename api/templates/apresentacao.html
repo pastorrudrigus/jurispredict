@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JurisPredict · Previne Brasil — Apresentação</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/theme/white.css" />
+  <style>
+    :root { --azul:#1351b4; --azul-escuro:#0c326f; --verde:#168821; --vermelho:#d4351c; --amarelo:#f2c200; }
+    .reveal { font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+    .reveal h1,.reveal h2,.reveal h3 { color:var(--azul-escuro); text-transform:none; letter-spacing:0; }
+    .reveal h1 { font-size:2.0em; }
+    .reveal section { text-align:left; }
+    .reveal .center { text-align:center; }
+    .reveal .tag { display:inline-block; background:var(--azul); color:#fff; padding:4px 14px; border-radius:999px; font-size:.5em; font-weight:600; }
+    .reveal .big { font-size:1.8em; font-weight:800; color:var(--vermelho); }
+    .reveal .biggreen { font-size:1.6em; font-weight:800; color:var(--verde); }
+    .reveal table { font-size:.7em; }
+    .reveal th { background:#eef2f8; color:#222; }
+    .reveal .cards { display:flex; gap:18px; margin-top:10px; }
+    .reveal .card { flex:1; background:#f4f6fa; border:1px solid #dfe4ec; border-radius:12px; padding:16px; text-align:center; }
+    .reveal .card .v { font-size:1.5em; font-weight:800; color:var(--azul-escuro); }
+    .reveal .card .l { font-size:.55em; color:#555; text-transform:uppercase; letter-spacing:.04em; }
+    .reveal .muted { color:#666; font-size:.7em; }
+    .reveal .pill { background:var(--amarelo); color:#5a4700; padding:2px 10px; border-radius:999px; font-size:.6em; font-weight:700; }
+    .reveal section.title { text-align:center; }
+    .reveal .grad { background:linear-gradient(135deg,var(--azul),var(--azul-escuro)); color:#fff; }
+    .reveal .grad h1, .reveal .grad h2 { color:#fff; }
+    .reveal code { color:var(--azul-escuro); }
+    .reveal .footer { position:fixed; bottom:8px; right:14px; font-size:.4em; color:#999; }
+  </style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+  <!-- 1. Capa -->
+  <section class="title grad" data-background-color="#0c326f">
+    <span class="tag" style="background:#fff;color:#0c326f">Atenção Primária à Saúde · Previne Brasil</span>
+    <h1>JurisPredict</h1>
+    <h3 style="color:#dce6f7">Quanto recurso federal seu município deixa na mesa — e como capturá-lo</h3>
+    <p class="muted" style="color:#aebfdc">Do indicador agregado à ação por equipe e por paciente</p>
+  </section>
+
+  <!-- 2. O problema -->
+  <section>
+    <h2>O problema</h2>
+    <p>O <strong>Previne Brasil</strong> repassa recurso federal por <strong>desempenho</strong> em 7 indicadores da APS.</p>
+    <ul>
+      <li>Quase todo município <strong>fica abaixo das metas</strong> em vários indicadores.</li>
+      <li>Cada ponto não atingido é <strong>dinheiro que deixa de entrar</strong> — todo quadrimestre.</li>
+      <li>O gestor raramente enxerga <strong>quanto vale</strong> fechar cada lacuna, nem <strong>por onde começar</strong>.</li>
+    </ul>
+    <p class="center big" style="margin-top:30px">Recurso disponível, não capturado.</p>
+  </section>
+
+  <!-- 3. Como funciona -->
+  <section>
+    <h2>Como funciona o repasse</h2>
+    <p>7 indicadores → nota de cada um → <strong>ISF (0–10)</strong> → repasse por equipe.</p>
+    <pre><code data-trim>Nota = min( resultado / meta × 10 , 10 )
+ISF  = Σ(Nota × Peso) / 10
+Repasse = ISF/10 × Σ(valor_máx_equipe) × meses</code></pre>
+    <p class="muted">eSF: até R$ 3.225/mês · eAP 30h: R$ 2.418,75 · eAP 20h: R$ 1.612,50 — avaliação quadrimestral.</p>
+    <p>A fórmula é <strong>pública e reproduzível</strong> → dá para calcular o ganho <em>antes</em> de agir.</p>
+  </section>
+
+  <!-- 4. A oportunidade (Goiânia real) -->
+  <section>
+    <h2>A oportunidade — Goiânia/GO</h2>
+    <p class="muted">Indicadores reais 2024Q2 (API do DataSUS/DEMAS)</p>
+    <div class="cards">
+      <div class="card"><div class="l">ISF</div><div class="v">{{ "%.2f"|format(g.isf) }}</div></div>
+      <div class="card"><div class="l">Recebe / quadrimestre</div><div class="v" style="font-size:.9em">{{ g.repasse_atual | brl }}</div></div>
+      <div class="card" style="background:#fde3df"><div class="l">Na mesa / quadrimestre</div><div class="v" style="color:#d4351c;font-size:.9em">{{ g.repasse_potencial | brl }}</div></div>
+    </div>
+    <p style="margin-top:24px" class="center"><span class="big">≈ R$ {{ "%.1f"|format(g.repasse_potencial*3/1000000) }} mi/ano</span><br><span class="muted">deixados na mesa, só no componente de desempenho</span></p>
+  </section>
+
+  <!-- 5. O que a aplicação faz -->
+  <section>
+    <h2>O que a aplicação faz</h2>
+    <div class="cards">
+      <div class="card"><div class="v">1</div><strong>Diagnostica</strong><div class="muted">ISF, repasse atual e o quanto falta — ranking de recurso na mesa</div></div>
+      <div class="card"><div class="v">2</div><strong>Simula</strong><div class="muted">arrasta os indicadores e vê o ganho em R$ em tempo real</div></div>
+      <div class="card"><div class="v">3</div><strong>Aciona</strong><div class="muted">lista nominal de pacientes por equipe para bater a meta</div></div>
+    </div>
+    <p class="center muted" style="margin-top:30px">Do "quanto" (gestor) ao "quem" (equipe na ponta).</p>
+  </section>
+
+  <!-- 6. Prioridade por R$ -->
+  <section>
+    <h2>Priorização por retorno</h2>
+    <p>Para cada indicador: quanto falta, quantos casos a mais e <strong>quanto vale</strong>.</p>
+    <table>
+      <tr><th>Indicador</th><th>Atual</th><th>Meta</th><th>Faltam</th><th>Ganho potencial</th></tr>
+      {% for p in g.prioridades(4) %}
+      <tr>
+        <td>{{ p.nome }}</td>
+        <td>{{ "%.0f"|format(p.resultado) }}%</td>
+        <td>{{ "%.0f"|format(p.meta) }}%</td>
+        <td>{% if p.casos_adicionais %}+{{ p.casos_adicionais }}{% else %}—{% endif %}</td>
+        <td style="color:#168821;font-weight:700">{{ p.ganho_potencial | brl }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p class="muted">A equipe sabe exatamente onde concentrar esforço para o maior retorno.</p>
+  </section>
+
+  <!-- 7. Nível de paciente -->
+  <section>
+    <h2>Do agregado ao paciente</h2>
+    <p>O recurso "na mesa" vira <strong>worklist por equipe</strong>:</p>
+    <blockquote style="font-size:.7em">
+      ESF Setor Sul — "Hipertensos com PA aferida": cobertura 3/14 (21%), meta 50%.
+      <strong>Converter +4 pacientes.</strong> Acionar: P-00005, P-00007, P-00026, P-00035.
+    </blockquote>
+    <p>Exportável em <strong>CSV e PDF</strong> para distribuir às equipes.</p>
+    <p class="muted">Dados individualizados via convênio com o DataSUS, com pseudonimização (LGPD).</p>
+  </section>
+
+  <!-- 8. Modelo 2024 / urgência -->
+  <section data-background-color="#fff7e0">
+    <h2>Por que agora <span class="pill">urgente</span></h2>
+    <p>Modelo 2024 (Portaria 3.493/2024): repasse por <strong>faixa de qualidade</strong>.</p>
+    <div class="cards">
+      <div class="card">Excelente<br><strong>R$ 3.000</strong></div>
+      <div class="card">Bom<br><strong>R$ 2.500</strong></div>
+      <div class="card">Suficiente<br><strong>R$ 2.000</strong></div>
+      <div class="card">Regular<br><strong>R$ 1.000</strong></div>
+    </div>
+    <p style="margin-top:20px">Classificação por desempenho real vale a partir de <strong>jan/2026</strong>.
+    Goiânia hoje: faixa <strong>{{ q2024.faixa }}</strong> — subir de faixa = mais recurso por equipe.</p>
+  </section>
+
+  <!-- 9. Arquitetura (técnico) -->
+  <section>
+    <span class="tag">Técnico</span>
+    <h2>Arquitetura</h2>
+    <ul style="font-size:.8em">
+      <li><code>previne/</code> — núcleo puro: indicadores, cálculo do ISF, análise de lacunas</li>
+      <li><code>patient.py</code> + <code>convenio.py</code> — nível de paciente + LGPD</li>
+      <li><code>modelo2024.py</code> — Componente de Qualidade (faixas)</li>
+      <li><code>datasus.py</code> — cliente da API real do DEMAS + parser SISAB</li>
+      <li><code>export.py</code> — CSV e PDF (gerador PDF sem dependências)</li>
+      <li><code>api/</code> — FastAPI: JSON + dashboard + simulador + esta apresentação</li>
+    </ul>
+    <p class="muted">48 testes automatizados · Python 3.11 · pronto para Docker.</p>
+  </section>
+
+  <!-- 10. Dados (técnico) -->
+  <section>
+    <span class="tag">Técnico</span>
+    <h2>Fonte de dados — pública e real</h2>
+    <pre><code data-trim>GET apidadosabertos.saude.gov.br
+  /atencao-primaria/indicador-desempenho-programa-previne-brasil
+  ?codigo_municipio=520870&quadrimestre=2024Q2</code></pre>
+    <ul style="font-size:.75em">
+      <li>API REST do DataSUS/DEMAS — <strong>sem autenticação</strong></li>
+      <li>IBGE de 6 dígitos · resultado = numerador/denominador</li>
+      <li>Cobertura 2024 · atualização quadrimestral · retry p/ TLS instável</li>
+      <li>CNES complementa o nº de equipes (cálculo do repasse)</li>
+    </ul>
+  </section>
+
+  <!-- 11. LGPD (técnico) -->
+  <section>
+    <span class="tag">Técnico</span>
+    <h2>Dados de paciente com responsabilidade</h2>
+    <ul style="font-size:.8em">
+      <li>Dados agregados: <strong>públicos</strong>. Dados de paciente: <strong>sensíveis</strong> (LGPD).</li>
+      <li>Acesso só via <strong>convênio/termo de cessão</strong> — base legal registrada.</li>
+      <li><strong>Pseudonimização irreversível</strong> (hash + sal) antes de processar.</li>
+      <li>O sistema <strong>nunca</strong> manipula CPF/CNS em claro.</li>
+    </ul>
+    <p class="muted">Demonstração usa amostra sintética (sem PII).</p>
+  </section>
+
+  <!-- 12. Viabilidade -->
+  <section>
+    <h2>Viabilidade</h2>
+    <table>
+      <tr><th>Aspecto</th><th>Situação</th></tr>
+      <tr><td>Disponibilidade dos dados</td><td>Alta — API pública</td></tr>
+      <tr><td>Reprodutibilidade do cálculo</td><td>Total — fórmula oficial</td></tr>
+      <tr><td>Cálculo antecipado do ganho</td><td>Sim</td></tr>
+      <tr><td>Cobertura</td><td>~5.570 municípios</td></tr>
+      <tr><td>Acesso programático</td><td>Alta — REST sem login</td></tr>
+    </table>
+  </section>
+
+  <!-- 13. Chamada à ação -->
+  <section class="title grad" data-background-color="#0c326f">
+    <h2 style="color:#fff">Próximos passos</h2>
+    <ul style="display:inline-block;text-align:left;color:#eef">
+      <li>Integrar CNES → repasse 100% com dados reais</li>
+      <li>Carga nacional dos ~5.570 municípios</li>
+      <li>Painel por equipe para a ponta acompanhar metas</li>
+    </ul>
+    <p class="biggreen" style="color:#7fe39a;margin-top:24px">Recurso na mesa → recurso capturado.</p>
+  </section>
+
+</div></div>
+
+<div class="footer">JurisPredict · Previne Brasil</div>
+<a href="/apresentacao.pdf" style="position:fixed;top:10px;right:12px;z-index:30;background:#168821;color:#fff;padding:6px 14px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;font-family:sans-serif">⬇ PDF</a>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({ hash:true, slideNumber:'c/t', transition:'slide', controls:true, progress:true });
+</script>
+</body>
+</html>

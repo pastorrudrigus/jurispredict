@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+  <h2>Quanto cada município deixa de receber</h2>
+  <p>
+    Ranking por <strong>recurso potencial não capturado</strong> no componente
+    Pagamento por Desempenho (por quadrimestre). Quanto maior o valor, maior a
+    oportunidade de aumentar o repasse federal atingindo as metas.
+  </p>
+
+  <div class="cards">
+    <div class="card">
+      <div class="rotulo">Municípios analisados</div>
+      <div class="valor">{{ avaliacoes | length }}</div>
+    </div>
+    <div class="card">
+      <div class="rotulo">Recurso na mesa (total/quadrimestre)</div>
+      <div class="valor destaque">{{ total_potencial | brl }}</div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Município</th>
+        <th class="num">ISF</th>
+        <th class="num">Repasse atual</th>
+        <th class="num">Repasse máximo</th>
+        <th class="num">Potencial não captado</th>
+        <th>Aproveitamento</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in avaliacoes %}
+      <tr>
+        <td><a href="/municipio/{{ a.ibge }}">{{ a.municipio }}/{{ a.uf }}</a></td>
+        <td class="num">{{ "%.2f"|format(a.isf) }}</td>
+        <td class="num">{{ a.repasse_atual | brl }}</td>
+        <td class="num">{{ a.repasse_maximo | brl }}</td>
+        <td class="num destaque">{{ a.repasse_potencial | brl }}</td>
+        <td>
+          {% set pct = a.percentual_aproveitado %}
+          <div class="barra" title="{{ '%.1f'|format(pct) }}%">
+            <span style="width: {{ pct }}%"></span>
+          </div>
+          {{ "%.0f"|format(pct) }}%
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}
