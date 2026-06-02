@@ -157,3 +157,31 @@ def test_indicador_nao_informado_conta_como_zero():
     )
     # ISF = 10*1/10 = 1.0 (so I1 com peso 1 pontuou)
     assert a.isf == pytest.approx(1.0)
+
+
+def test_apenas_reportados_renormaliza_pelos_pesos():
+    # So I1 (meta 45, peso 1) informado, na meta. Modo apenas_reportados:
+    # ISF = (10*1)/1 = 10 (renormaliza pelo unico peso reportado).
+    a = avaliar_municipio(
+        municipio="Teste",
+        uf="SP",
+        ibge="0000000",
+        equipes={"eSF": 1},
+        resultados=[ResultadoIndicador("I1", 45.0)],
+        apenas_reportados=True,
+    )
+    assert a.isf == pytest.approx(10.0)
+    # So o indicador reportado entra na analise.
+    assert {i.codigo for i in a.indicadores} == {"I1"}
+
+
+def test_apenas_reportados_seis_indicadores_nao_penaliza_ausente():
+    # 6 indicadores na meta (sem I6). Modo oficial: ISF = (8 pesos*10)/10 = 8.
+    # Modo apenas_reportados: ISF = 10 (nao penaliza o I6 ausente).
+    seis = ["I1", "I2", "I3", "I4", "I5", "I7"]
+    from previne.indicators import indicador as ind
+
+    resultados = [ResultadoIndicador(c, ind(c).meta) for c in seis]
+    base = dict(municipio="T", uf="SP", ibge="0", equipes={"eSF": 1}, resultados=resultados)
+    assert avaliar_municipio(**base).isf == pytest.approx(8.0)
+    assert avaliar_municipio(**base, apenas_reportados=True).isf == pytest.approx(10.0)

@@ -56,8 +56,14 @@ class MunicipioRepository:
         """Retorna o registro bruto de um municipio pelo codigo IBGE."""
         return self._registros.get(str(ibge))
 
-    def avaliar(self, ibge: str, meses: int = 4) -> AvaliacaoMunicipio | None:
-        """Gera a AvaliacaoMunicipio para o codigo IBGE informado."""
+    def avaliar(
+        self, ibge: str, meses: int = 4, apenas_reportados: bool = True
+    ) -> AvaliacaoMunicipio | None:
+        """Gera a AvaliacaoMunicipio para o codigo IBGE informado.
+
+        apenas_reportados=True (padrao) calcula o ISF sobre os indicadores
+        disponiveis, pois o dataset aberto nao publica todos (ex.: I6 ausente).
+        """
         reg = self.obter(ibge)
         if reg is None:
             return None
@@ -77,6 +83,7 @@ class MunicipioRepository:
             equipes={k: int(v) for k, v in reg.get("equipes", {}).items()},
             resultados=resultados,
             meses=meses,
+            apenas_reportados=apenas_reportados,
         )
 
     def avaliar_todos(self, meses: int = 4) -> list[AvaliacaoMunicipio]:

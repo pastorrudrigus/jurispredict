@@ -125,6 +125,7 @@ previne/                  núcleo de domínio (puro Python, testável, sem rede)
 ├── modelo2024.py         Componente de Qualidade 2024 (faixas Excelente…Regular)
 ├── export.py             exportação das worklists em CSV e PDF (PDF sem deps)
 ├── cnes.py               nº de equipes por município (estimativa real + base CNES)
+├── slides.py             apresentação em PDF (deck de slides, sem dependências)
 ├── datasus.py            cliente da API DEMAS + parser de CSV do SISAB
 ├── repository.py         carga de dados (exemplo embarcado ou JSON externo)
 ├── ingest.py             CLI de ingestão de dados reais do DataSUS
@@ -211,7 +212,8 @@ Em um PaaS (Render, Railway, Fly.io, etc.):
 - A porta é lida de `$PORT`; há health check em **`/healthz`**.
 
 A **apresentação** do projeto fica embutida na própria app em **`/apresentacao`**
-(slides reveal.js, navegáveis no navegador).
+(slides reveal.js, navegáveis no navegador), com download em PDF em
+**`/apresentacao.pdf`** (deck gerado em Python puro, com os números reais).
 
 ### Simulador interativo
 
@@ -311,17 +313,29 @@ O PDF é gerado em **Python puro, sem dependências externas** (ver
 ## Exemplo: Goiânia/GO (IBGE 5208707)
 
 Indicadores I1–I5 e I7 são **dados REAIS de 2024Q2** (visão homologadas) puxados
-da API do DEMAS; I6 (hipertensos) não consta no dataset público desse
-quadrimestre e está sinalizado como estimado. Equipes **estimadas a partir das
-pessoas vinculadas reais** (CNES, cadastro-vinculado 202412): **321 eSF + 86 eAP**.
+da API do DEMAS. Equipes **estimadas a partir das pessoas vinculadas reais**
+(CNES, cadastro-vinculado): **321 eSF + 86 eAP**.
 
 | Métrica | Valor |
 |---------|------:|
-| ISF | **7,37** / 10 |
-| Repasse atual / quadrimestre (modelo 2022) | R$ 3.664.658,46 |
-| **Deixado na mesa / quadrimestre** | **R$ 1.308.291,54** |
+| ISF | **7,39** / 10 |
+| Repasse atual / quadrimestre (modelo 2022) | R$ 3.675.746 |
+| **Deixado na mesa / quadrimestre** | **R$ 1.297.204** |
 | Projeção anual (×3) | ≈ **R$ 3,9 milhões** |
 | Faixa no modelo 2024 | **Bom** (R$ 3,86 mi/quad) |
+
+> **Sobre o I6 (hipertensos):** esse indicador **não é publicado** no dataset
+> aberto (2024) — para nenhum município/quadrimestre. Por isso o ISF é calculado
+> **sobre os indicadores disponíveis** (renormalizando os pesos), em vez de tratar
+> o ausente como nota 0, o que penalizaria injustamente. Ver o parâmetro
+> `apenas_reportados` em [`previne/calculator.py`](previne/calculator.py).
+
+## Ranking nacional (27 capitais + Sobral)
+
+O conjunto de dados embarcado traz as **27 capitais + Sobral**, todas com dados
+reais 2024Q2. Total **deixado na mesa: ≈ R$ 31,7 milhões por quadrimestre**
+(~R$ 95 mi/ano) só nesses municípios. Maiores oportunidades absolutas: São Paulo
+(~R$ 6,6 mi/quad), Belo Horizonte e Rio de Janeiro.
 
 Indicadores reais: I1 pré-natal **51,8%** (meta 45 ✓), I2 sífilis/HIV **72,1%**
 (meta 60 ✓), I3 odonto gestante **41,7%**, I4 citopatológico **19,1%**, I5 vacina

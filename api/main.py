@@ -32,6 +32,7 @@ from previne.repository import MunicipioRepository
 from previne.patient import analisar_equipes, gerar_amostra_sintetica
 from previne.modelo2024 import avaliar_qualidade_2024, FAIXAS
 from previne.export import worklist_para_csv, worklist_para_pdf
+from previne.slides import montar_deck, slides_para_pdf
 
 app = FastAPI(
     title="JurisPredict - Previne Brasil",
@@ -276,6 +277,18 @@ def pagina_apresentacao(request: Request) -> HTMLResponse:
     )
     return TEMPLATES.TemplateResponse(
         request, "apresentacao.html", {"g": goiania, "q2024": q2024}
+    )
+
+
+@app.get("/apresentacao.pdf")
+def apresentacao_pdf() -> Response:
+    """Baixa a apresentacao em PDF (deck de slides), com numeros reais."""
+    goiania = repo.avaliar("5208707") or repo.avaliar_todos()[0]
+    pdf = slides_para_pdf(montar_deck(goiania))
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="jurispredict_apresentacao.pdf"'},
     )
 
 

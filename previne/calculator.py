@@ -144,6 +144,7 @@ def avaliar_municipio(
     equipes: dict[str, int],
     resultados: list[ResultadoIndicador],
     meses: int = MESES_POR_QUADRIMESTRE,
+    apenas_reportados: bool = False,
 ) -> AvaliacaoMunicipio:
     """Avalia um municipio: calcula ISF, repasse e analise de lacunas por indicador.
 
@@ -152,6 +153,10 @@ def avaliar_municipio(
         uf: sigla da unidade federativa.
         ibge: codigo IBGE do municipio.
         equipes: mapa {codigo_tipo_equipe: quantidade}, ex.: {"eSF": 12}.
+        apenas_reportados: se True, calcula o ISF apenas sobre os indicadores
+            informados, renormalizando pela soma dos pesos reportados (em vez de
+            tratar os ausentes como nota 0). Util quando o dataset aberto nao
+            publica todos os indicadores (ex.: I6 ausente em 2024).
         resultados: lista de ResultadoIndicador (um por indicador apurado).
         meses: meses do periodo de repasse (padrao = 1 quadrimestre = 4 meses).
 
@@ -161,28 +166,35 @@ def avaliar_municipio(
     por_codigo = {r.codigo: r for r in resultados}
     base_mensal = _base_mensal(equipes)
 
-    # Nota de cada indicador (0 para indicadores nao informados).
+    # Conjunto de indicadores considerados no ISF.
+    if apenas_reportados:
+        considerados = [ind for ind in INDICADORES if ind.codigo in por_codigo]
+    else:
+        considerados = list(INDICADORES)
+    peso_total = sum(ind.peso for ind in considerados) or PESO_TOTAL
+
+    # Nota de cada indicador (0 para indicadores nao informados, no modo oficial).
     notas: dict[str, float] = {}
-    for ind in INDICADORES:
+    for ind in considerados:
         res = por_codigo.get(ind.codigo)
         notas[ind.codigo] = nota_indicador(res.resultado, ind.meta) if res else 0.0
 
-    isf_atual = isf(notas)
+    isf_atual = sum(nota * indicador(c).peso for c, nota in notas.items()) / peso_total
     repasse_maximo = base_mensal * meses
     repasse_atual = (isf_atual / 10.0) * repasse_maximo
 
     # Analise por indicador.
     analises: list[AnaliseIndicador] = []
-    for ind in INDICADORES:
+    for ind in considerados:
         res = por_codigo.get(ind.codigo) or ResultadoIndicador(ind.codigo, 0.0)
         nota = notas[ind.codigo]
         atingiu = nota >= 10.0
         lacuna_pp = max(0.0, ind.meta - res.resultado)
 
         # Ganho ao levar este indicador a meta (nota -> 10):
-        #   delta_isf = (10 - nota) * peso / PESO_TOTAL
+        #   delta_isf = (10 - nota) * peso / peso_total
         #   delta_repasse = (delta_isf / 10) * repasse_maximo
-        delta_isf = (10.0 - nota) * ind.peso / PESO_TOTAL
+        delta_isf = (10.0 - nota) * ind.peso / peso_total
         ganho = (delta_isf / 10.0) * repasse_maximo
         reais_por_ponto = (ganho / lacuna_pp) if lacuna_pp > 0 else 0.0
 
