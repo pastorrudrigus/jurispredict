@@ -1,0 +1,16 @@
+# Blueprint do Render (https://render.com) - deploy com um clique a partir do repo.
+# Passos:
+#   1. Faca login no Render e clique em "New +" > "Blueprint".
+#   2. Conecte este repositorio; o Render le este arquivo automaticamente.
+#   3. Confirme. A app sobe em https://<nome>.onrender.com
+services:
+  - type: web
+    name: jurispredict
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 8000

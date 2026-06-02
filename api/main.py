@@ -75,6 +75,12 @@ class SimulacaoInput(BaseModel):
 # --------------------------------------------------------------------------- #
 # Endpoints JSON
 # --------------------------------------------------------------------------- #
+@app.get("/healthz")
+def healthz() -> dict:
+    """Health check para o provedor de hospedagem."""
+    return {"status": "ok", "municipios": len(repo.ibges())}
+
+
 @app.get("/api/indicadores")
 def listar_indicadores() -> list[dict]:
     """Retorna a definicao dos 7 indicadores (meta, peso, descricao)."""
@@ -255,6 +261,21 @@ def pagina_simulador(request: Request, ibge: str = "5208707") -> HTMLResponse:
             "indicadores": [asdict(i) for i in INDICADORES],
             "equipes": [asdict(t) for t in TIPOS_EQUIPE],
         },
+    )
+
+
+@app.get("/apresentacao", response_class=HTMLResponse)
+def pagina_apresentacao(request: Request) -> HTMLResponse:
+    """Apresentacao em slides (reveal.js) do projeto, embutida na app."""
+    goiania = repo.avaliar("5208707") or repo.avaliar_todos()[0]
+    q2024 = avaliar_qualidade_2024(
+        isf=goiania.isf,
+        equipes={
+            k: int(v) for k, v in (repo.obter(goiania.ibge) or {}).get("equipes", {}).items()
+        },
+    )
+    return TEMPLATES.TemplateResponse(
+        request, "apresentacao.html", {"g": goiania, "q2024": q2024}
     )
 
 

@@ -139,6 +139,7 @@ pip install -r requirements.txt
 # 2. Subir a aplicação web (usa dados de exemplo embarcados)
 uvicorn api.main:app --reload
 #    → abra http://localhost:8000
+#    → apresentação em http://localhost:8000/apresentacao
 
 # 3. Rodar os testes
 pytest
@@ -175,6 +176,26 @@ curl -X POST http://localhost:8000/api/simular -H 'Content-Type: application/jso
   "meses": 4
 }'
 ```
+
+### Deploy (produção)
+
+A aplicação está pronta para deploy via **Docker** ou por blueprint do **Render**:
+
+```bash
+# Local, com Docker
+docker build -t jurispredict .
+docker run -p 8000:8000 jurispredict
+```
+
+Em um PaaS (Render, Railway, Fly.io, etc.):
+
+- **Render:** "New + → Blueprint", conecte o repositório — o [`render.yaml`](render.yaml)
+  já define o serviço Docker, a porta e o health check (`/healthz`).
+- **Heroku/Railway:** usam o [`Procfile`](Procfile) automaticamente.
+- A porta é lida de `$PORT`; há health check em **`/healthz`**.
+
+A **apresentação** do projeto fica embutida na própria app em **`/apresentacao`**
+(slides reveal.js, navegáveis no navegador).
 
 ### Simulador interativo
 
