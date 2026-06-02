@@ -3,10 +3,13 @@
 Expoe:
   - GET /                      dashboard HTML (ranking de municipios)
   - GET /municipio/{ibge}      pagina detalhada de um municipio
+  - GET /simulador             simulador interativo (sliders por indicador)
+  - GET /equipes/{ibge}        pendencias por equipe (nivel de paciente)
   - GET /api/indicadores       definicao dos 7 indicadores
   - GET /api/municipios        avaliacao resumida de todos os municipios
   - GET /api/municipio/{ibge}  avaliacao completa de um municipio
   - POST /api/simular          simula uma avaliacao a partir de dados informados
+  - GET /api/equipes/{ibge}    pendencias por equipe (amostra sintetica de pacientes)
 
 Rode com:  uvicorn api.main:app --reload
 """
@@ -26,6 +29,7 @@ from previne.calculator import ResultadoIndicador, avaliar_municipio
 from previne.indicators import INDICADORES
 from previne.financing import TIPOS_EQUIPE
 from previne.repository import MunicipioRepository
+from previne.patient import analisar_equipes, gerar_amostra_sintetica
 
 app = FastAPI(
     title="JurisPredict - Previne Brasil",
@@ -133,6 +137,26 @@ def simular(entrada: SimulacaoInput) -> dict:
     return asdict(avaliacao)
 
 
+@app.get("/api/equipes/{ibge}")
+def pendencias_equipes(ibge: str) -> dict:
+    """Pendencias por equipe em nivel de paciente.
+
+    DEMONSTRACAO: usa uma amostra SINTETICA de pacientes (sem dados reais/PII).
+    Em producao, alimente com extratos individualizados autorizados via
+    previne.convenio.ConvenioDataSUS.
+    """
+    avaliacao = repo.avaliar(ibge)
+    nome = avaliacao.municipio if avaliacao else ibge
+    pacientes = gerar_amostra_sintetica()
+    pendencias = analisar_equipes(pacientes)
+    return {
+        "ibge": ibge,
+        "municipio": nome,
+        "fonte": "amostra sintetica (demonstracao)",
+        "pendencias": [asdict(p) for p in pendencias],
+    }
+
+
 # --------------------------------------------------------------------------- #
 # Paginas HTML
 # --------------------------------------------------------------------------- #
@@ -159,4 +183,42 @@ def pagina_municipio(request: Request, ibge: str) -> HTMLResponse:
         request,
         "municipio.html",
         {"a": avaliacao, "prioridades": avaliacao.prioridades()},
+    )
+
+
+@app.get("/simulador", response_class=HTMLResponse)
+def pagina_simulador(request: Request, ibge: str = "5208707") -> HTMLResponse:
+    """Simulador interativo com sliders por indicador, pre-carregado com um municipio."""
+    avaliacao = repo.avaliar(ibge)
+    registro = repo.obter(ibge)
+    if avaliacao is None:  # fallback: primeiro municipio disponivel
+        avaliacao = repo.avaliar_todos()[0]
+        registro = repo.obter(avaliacao.ibge)
+    return TEMPLATES.TemplateResponse(
+        request,
+        "simulador.html",
+        {
+            "a": avaliacao,
+            "equipes_municipio": (registro or {}).get("equipes", {"eSF": 1}),
+            "indicadores": [asdict(i) for i in INDICADORES],
+            "equipes": [asdict(t) for t in TIPOS_EQUIPE],
+        },
+    )
+
+
+@app.get("/equipes/{ibge}", response_class=HTMLResponse)
+def pagina_equipes(request: Request, ibge: str) -> HTMLResponse:
+    """Pagina com pendencias por equipe (worklists em nivel de paciente)."""
+    avaliacao = repo.avaliar(ibge)
+    nome = avaliacao.municipio if avaliacao else ibge
+    pacientes = gerar_amostra_sintetica()
+    pendencias = analisar_equipes(pacientes)
+    # Agrupa por equipe para exibicao.
+    por_equipe: dict[str, list] = {}
+    for p in pendencias:
+        por_equipe.setdefault(p.equipe_nome, []).append(p)
+    return TEMPLATES.TemplateResponse(
+        request,
+        "equipes.html",
+        {"municipio": nome, "ibge": ibge, "por_equipe": por_equipe},
     )

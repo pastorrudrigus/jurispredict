@@ -83,18 +83,27 @@ CSV exportado do painel do SISAB. Veja [`previne/datasus.py`](previne/datasus.py
 previne/                  núcleo de domínio (puro Python, testável, sem rede)
 ├── indicators.py         os 7 indicadores: metas, pesos, numerador/denominador
 ├── financing.py          tipos de equipe e valores máximos
-├── calculator.py         notas, ISF, repasse e ANÁLISE DE LACUNAS
-├── datasus.py            cliente CKAN/DataSUS + parser de CSV do SISAB
+├── calculator.py         notas, ISF, repasse e ANÁLISE DE LACUNAS (agregado)
+├── patient.py            análise em NÍVEL DE PACIENTE + instruções por equipe
+├── convenio.py           conector autorizado ao DataSUS (LGPD + pseudonimização)
+├── datasus.py            cliente CKAN/DataSUS + parser de CSV do SISAB (agregado)
 ├── repository.py         carga de dados (exemplo embarcado ou JSON externo)
 ├── ingest.py             CLI de ingestão de dados do DataSUS
 └── data/                 conjunto de exemplo (roda offline)
 
 api/                      camada web (FastAPI)
 ├── main.py               endpoints JSON + páginas HTML
-└── templates/            dashboard e página do município
+└── templates/            dashboard, município, simulador interativo, equipes
 
 tests/                    suíte de testes (pytest)
 ```
+
+### Dois níveis de análise
+
+| Nível | Módulo | Pergunta que responde | Fonte de dados |
+|-------|--------|-----------------------|----------------|
+| **Agregado** (município) | `calculator.py` | *Quanto* recurso está na mesa? | Dados abertos (públicos) |
+| **Paciente** (equipe) | `patient.py` + `convenio.py` | *Quem* atender e *qual equipe* age? | Extrato individualizado (convênio) |
 
 ---
 
@@ -118,10 +127,13 @@ pytest
 |--------|------|-----------|
 | GET | `/` | Dashboard: ranking por recurso não capturado |
 | GET | `/municipio/{ibge}` | Página detalhada com prioridades de esforço |
+| GET | `/simulador` | **Simulador interativo** (sliders por indicador) |
+| GET | `/equipes/{ibge}` | **Pendências por equipe** (worklist por paciente) |
 | GET | `/api/indicadores` | Definição dos 7 indicadores |
 | GET | `/api/municipios` | Avaliação resumida de todos |
 | GET | `/api/municipio/{ibge}` | Avaliação completa de um município |
 | POST | `/api/simular` | Simula uma avaliação a partir de dados informados |
+| GET | `/api/equipes/{ibge}` | Pendências por equipe em nível de paciente |
 
 Exemplo de simulação:
 
@@ -137,6 +149,59 @@ curl -X POST http://localhost:8000/api/simular -H 'Content-Type: application/jso
 }'
 ```
 
+### Simulador interativo
+
+Acesse **`/simulador`** (pré-carregado com Goiânia). Arraste os sliders de cada
+indicador e ajuste o número de equipes para ver, **em tempo real**, o ISF e
+quanto o município passa a receber por quadrimestre.
+
+### Nível de paciente: instruções por equipe
+
+O módulo `previne/patient.py` traduz o recurso "na mesa" em **ação operacional**:
+para cada equipe e indicador, calcula quantos pacientes faltam para bater a meta
+e gera a **lista nominal** de quem acionar. Exemplo de instrução gerada:
+
+> *ESF Setor Sul — "Hipertensos com PA aferida": cobertura 3/14 (21%), meta 50%.
+> Converter +4 paciente(s). Acionar prioritariamente: P-00005, P-00007, P-00026, P-00035.*
+
+```python
+from previne.patient import gerar_amostra_sintetica, analisar_equipes
+
+pacientes = gerar_amostra_sintetica()       # amostra sintética (sem PII) p/ demo
+for pend in analisar_equipes(pacientes):
+    if pend.faltam_para_meta:
+        print(pend.instrucao)
+```
+
+#### Convênio com o DataSUS e LGPD
+
+Dados em nível de paciente **não são públicos** — são dados pessoais sensíveis
+de saúde. O acesso exige instrumento formal (termo de cessão/convênio) e base
+legal (LGPD art. 11, II, para execução de política pública). O módulo
+`previne/convenio.py` estrutura isso com responsabilidade:
+
+- `Convenio` registra ente, número do termo, finalidade, base legal e vigência;
+- `pseudonimizar()` converte CNS/CPF em um identificador **irreversível** (hash
+  com sal) **antes** de qualquer processamento — o sistema nunca vê o documento;
+- `ConvenioDataSUS.carregar_csv/json()` lê o extrato autorizado já pseudonimizado.
+
+```python
+from datetime import date
+from previne.convenio import Convenio, ConvenioDataSUS
+
+conv = Convenio(
+    ente="Secretaria Municipal de Saúde de Goiânia",
+    numero_termo="TC-2026/001",
+    finalidade="Monitoramento do desempenho da APS (Previne Brasil)",
+    vigencia_ate=date(2027, 12, 31),
+    sal="<segredo-do-ente>",
+)
+pacientes = ConvenioDataSUS(conv).carregar_csv("extrato_autorizado.csv")
+```
+
+> Sem o instrumento autorizativo, use apenas dados agregados (públicos) ou a
+> amostra sintética para demonstração.
+
 ### Ingestão de dados reais
 
 ```bash
@@ -148,6 +213,22 @@ python -m previne.ingest csv export_sisab.csv --saida data/municipios.json
 ```
 
 ---
+
+## Exemplo: Goiânia/GO (IBGE 5208707)
+
+Números **ilustrativos** (estimados até a conexão ao vivo com o SISAB), perfil de
+capital com ~1,5 mi de habitantes e 232 eSF + 18 eAP30 + 10 eAP20:
+
+| Métrica | Valor |
+|---------|------:|
+| ISF | **7,21** / 10 |
+| Repasse atual / quadrimestre | R$ 2.329.774,35 |
+| Repasse máximo | R$ 3.231.450,00 |
+| **Deixado na mesa / quadrimestre** | **R$ 901.675,65** |
+| Projeção anual (×3 quadrimestres) | ≈ R$ 2,7 milhões |
+
+Maior oportunidade: **atendimento odontológico a gestantes** (24,1% vs. meta 60%)
+— sozinho vale ≈ R$ 387 mil por quadrimestre.
 
 ## Viabilidade (resumo)
 

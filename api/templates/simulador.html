@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Simulador interativo — JurisPredict{% endblock %}
+{% block content %}
+  <h2>Simulador interativo</h2>
+  <p>
+    Arraste os indicadores e ajuste o número de equipes para ver, em tempo real,
+    o <strong>ISF</strong> e <strong>quanto o município recebe por quadrimestre</strong>.
+    Pré-carregado com <strong>{{ a.municipio }}/{{ a.uf }}</strong>.
+  </p>
+
+  <div class="cards">
+    <div class="card"><div class="rotulo">ISF (0 a 10)</div><div class="valor" id="isf">—</div></div>
+    <div class="card"><div class="rotulo">Repasse / quadrimestre</div><div class="valor" id="atual">—</div></div>
+    <div class="card"><div class="rotulo">Repasse máximo</div><div class="valor ganho" id="maximo">—</div></div>
+    <div class="card"><div class="rotulo">Na mesa</div><div class="valor destaque" id="potencial">—</div></div>
+  </div>
+
+  <div style="display:flex;gap:24px;flex-wrap:wrap">
+    <section style="flex:2;min-width:340px;background:#fff;border:1px solid var(--borda);border-radius:10px;padding:18px">
+      <h3 style="margin-top:0">Indicadores</h3>
+      {% for ind in a.indicadores %}
+      <div style="margin-bottom:14px">
+        <label style="display:flex;justify-content:space-between;font-size:.9rem">
+          <span>{{ ind.nome }} <span style="color:#888">(meta {{ "%.0f"|format(ind.meta) }}%, peso {{ ind.peso }})</span></span>
+          <strong><span class="val" data-cod="{{ ind.codigo }}">{{ "%.0f"|format(ind.resultado) }}</span>%</strong>
+        </label>
+        <input type="range" min="0" max="100" step="1" value="{{ ind.resultado|round(0,'floor')|int }}"
+               class="ind" data-cod="{{ ind.codigo }}" data-meta="{{ ind.meta }}" style="width:100%">
+      </div>
+      {% endfor %}
+    </section>
+
+    <section style="flex:1;min-width:240px;background:#fff;border:1px solid var(--borda);border-radius:10px;padding:18px">
+      <h3 style="margin-top:0">Equipes</h3>
+      {% for eq in equipes %}
+      <div style="margin-bottom:12px">
+        <label style="display:block;font-size:.9rem">{{ eq.nome }}
+          <span style="color:#888">({{ eq.valor_maximo_mensal | brl }}/mês)</span>
+        </label>
+        <input type="number" min="0" class="eq" data-cod="{{ eq.codigo }}"
+               value="{{ equipes_municipio.get(eq.codigo, 0) }}" style="width:100px;padding:4px">
+      </div>
+      {% endfor %}
+      <label style="display:block;font-size:.9rem;margin-top:10px">Meses do período</label>
+      <input type="number" id="meses" min="1" value="4" style="width:100px;padding:4px">
+    </section>
+  </div>
+
+  <script>
+    const fmtBRL = v => "R$ " + v.toLocaleString("pt-BR", {minimumFractionDigits:2, maximumFractionDigits:2});
+
+    function coletar() {
+      const resultados = [...document.querySelectorAll(".ind")].map(s => ({
+        codigo: s.dataset.cod, resultado: parseFloat(s.value)
+      }));
+      const equipes = {};
+      document.querySelectorAll(".eq").forEach(e => {
+        const n = parseInt(e.value || "0", 10);
+        if (n > 0) equipes[e.dataset.cod] = n;
+      });
+      return {
+        municipio: "{{ a.municipio }}", uf: "{{ a.uf }}", ibge: "{{ a.ibge }}",
+        equipes, resultados, meses: parseInt(document.getElementById("meses").value || "4", 10)
+      };
+    }
+
+    async function simular() {
+      const r = await fetch("/api/simular", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(coletar())
+      });
+      const a = await r.json();
+      document.getElementById("isf").textContent = a.isf.toFixed(2);
+      document.getElementById("atual").textContent = fmtBRL(a.repasse_atual);
+      document.getElementById("maximo").textContent = fmtBRL(a.repasse_maximo);
+      document.getElementById("potencial").textContent = fmtBRL(a.repasse_potencial);
+    }
+
+    document.querySelectorAll(".ind").forEach(s => s.addEventListener("input", () => {
+      document.querySelector(`.val[data-cod="${s.dataset.cod}"]`).textContent = s.value;
+      simular();
+    }));
+    document.querySelectorAll(".eq, #meses").forEach(e => e.addEventListener("input", simular));
+    simular();
+  </script>
+{% endblock %}

@@ -18,6 +18,13 @@ from previne.calculator import (
     nota_indicador,
     isf,
 )
+from previne.patient import (
+    Paciente,
+    PendenciaEquipe,
+    analisar_equipes,
+    gerar_amostra_sintetica,
+)
+from previne.convenio import Convenio, ConvenioDataSUS, pseudonimizar
 
 __all__ = [
     "INDICADORES",
@@ -27,6 +34,13 @@ __all__ = [
     "avaliar_municipio",
     "nota_indicador",
     "isf",
+    "Paciente",
+    "PendenciaEquipe",
+    "analisar_equipes",
+    "gerar_amostra_sintetica",
+    "Convenio",
+    "ConvenioDataSUS",
+    "pseudonimizar",
 ]
 
 __version__ = "0.1.0"
