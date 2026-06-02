@@ -1,8 +1,8 @@
 """CLI de ingestao de dados do DataSUS / Dados Abertos do SUS.
 
 Uso:
-    python -m previne.ingest recursos
-        Lista os arquivos disponiveis no dataset de indicadores do SISAB.
+    python -m previne.ingest municipio 5208707 --quadrimestre 2024Q2
+        Busca os indicadores reais de um municipio na API do DEMAS e imprime/grava.
 
     python -m previne.ingest csv CAMINHO.csv --saida data/municipios.json
         Converte um CSV exportado do painel do SISAB para o formato do projeto.
@@ -21,15 +21,40 @@ from pathlib import Path
 from previne.datasus import DataSUSClient, parse_csv_sisab
 
 
-def _cmd_recursos(_: argparse.Namespace) -> int:
-    """Lista os recursos do dataset de indicadores do SISAB."""
+def _cmd_municipio(args: argparse.Namespace) -> int:
+    """Busca os indicadores reais de um municipio na API do DEMAS."""
     with DataSUSClient() as cli:
-        recursos = cli.listar_recursos()
-    if not recursos:
-        print("Nenhum recurso encontrado (ou API indisponivel).")
+        resultados = cli.buscar_indicadores_previne(
+            args.ibge, quadrimestre=args.quadrimestre, visao=args.visao
+        )
+    if not resultados:
+        print("Nenhum indicador retornado (verifique IBGE/quadrimestre ou a rede).")
         return 1
-    for r in recursos:
-        print(f"[{r.formato:5}] {r.nome}\n        id={r.id}\n        {r.url}")
+    for r in sorted(resultados, key=lambda x: x.codigo):
+        print(
+            f"{r.codigo}  resultado={r.resultado:5.1f}%  "
+            f"({r.numerador}/{r.denominador})  meta={r.indicador.meta:.0f}%"
+        )
+    if args.saida:
+        registro = {
+            "ibge": str(args.ibge),
+            "municipio": str(args.ibge),
+            "uf": "",
+            "equipes": {},
+            "resultados": [
+                {
+                    "codigo": r.codigo,
+                    "resultado": r.resultado,
+                    "numerador": r.numerador,
+                    "denominador": r.denominador,
+                }
+                for r in resultados
+            ],
+        }
+        Path(args.saida).write_text(
+            json.dumps([registro], ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        print(f"\nGravado em {args.saida}. Complete 'municipio', 'uf' e 'equipes' (CNES).")
     return 0
 
 
@@ -65,9 +90,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="previne.ingest", description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("recursos", help="lista recursos do dataset SISAB").set_defaults(
-        func=_cmd_recursos
-    )
+    p_mun = sub.add_parser("municipio", help="busca indicadores reais de um municipio")
+    p_mun.add_argument("ibge", help="codigo IBGE (6 ou 7 digitos)")
+    p_mun.add_argument("--quadrimestre", default="2024Q2", help="ex.: 2024Q1, 2024Q2")
+    p_mun.add_argument("--visao", default="homologadas", help="homologadas|validas|geral")
+    p_mun.add_argument("--saida", default="", help="grava o resultado em JSON (opcional)")
+    p_mun.set_defaults(func=_cmd_municipio)
 
     p_csv = sub.add_parser("csv", help="converte CSV do SISAB para JSON do projeto")
     p_csv.add_argument("arquivo", help="caminho do CSV exportado do SISAB")

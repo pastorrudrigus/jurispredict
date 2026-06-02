@@ -14,6 +14,13 @@
     com o DataSUS — ver <code>previne/convenio.py</code> (pseudonimização + LGPD).
   </p>
 
+  <p style="margin:16px 0">
+    <a class="botao" href="/api/equipes/{{ ibge }}/export.csv"
+       style="display:inline-block;background:var(--azul);color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:600;margin-right:8px">⬇ Baixar CSV</a>
+    <a class="botao" href="/api/equipes/{{ ibge }}/export.pdf"
+       style="display:inline-block;background:var(--verde);color:#fff;padding:8px 16px;border-radius:6px;text-decoration:none;font-weight:600">⬇ Baixar PDF</a>
+  </p>
+
   {% for equipe, pendencias in por_equipe.items() %}
   <h3>{{ equipe }}</h3>
   <table style="margin-bottom:24px">

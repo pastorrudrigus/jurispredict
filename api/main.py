@@ -20,7 +20,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
 from pydantic import BaseModel, Field
@@ -30,6 +30,8 @@ from previne.indicators import INDICADORES
 from previne.financing import TIPOS_EQUIPE
 from previne.repository import MunicipioRepository
 from previne.patient import analisar_equipes, gerar_amostra_sintetica
+from previne.modelo2024 import avaliar_qualidade_2024, FAIXAS
+from previne.export import worklist_para_csv, worklist_para_pdf
 
 app = FastAPI(
     title="JurisPredict - Previne Brasil",
@@ -137,6 +139,25 @@ def simular(entrada: SimulacaoInput) -> dict:
     return asdict(avaliacao)
 
 
+@app.get("/api/municipio/{ibge}/modelo2024")
+def municipio_modelo2024(ibge: str) -> dict:
+    """Avaliacao do municipio no modelo 2024 (Componente de Qualidade por faixa)."""
+    avaliacao = repo.avaliar(ibge)
+    registro = repo.obter(ibge)
+    if avaliacao is None or registro is None:
+        raise HTTPException(status_code=404, detail="Municipio nao encontrado")
+    q = avaliar_qualidade_2024(
+        isf=avaliacao.isf, equipes={k: int(v) for k, v in registro.get("equipes", {}).items()}
+    )
+    return {"ibge": ibge, "municipio": avaliacao.municipio, **asdict(q)}
+
+
+@app.get("/api/faixas2024")
+def faixas_2024() -> list[dict]:
+    """Faixas de qualidade do modelo 2024 e valores de referencia (eSF)."""
+    return [asdict(f) for f in FAIXAS]
+
+
 @app.get("/api/equipes/{ibge}")
 def pendencias_equipes(ibge: str) -> dict:
     """Pendencias por equipe em nivel de paciente.
@@ -155,6 +176,32 @@ def pendencias_equipes(ibge: str) -> dict:
         "fonte": "amostra sintetica (demonstracao)",
         "pendencias": [asdict(p) for p in pendencias],
     }
+
+
+@app.get("/api/equipes/{ibge}/export.csv")
+def exportar_equipes_csv(ibge: str) -> Response:
+    """Exporta as worklists por equipe em CSV (download)."""
+    pendencias = analisar_equipes(gerar_amostra_sintetica())
+    conteudo = worklist_para_csv(pendencias)
+    return Response(
+        content=conteudo,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="worklist_{ibge}.csv"'},
+    )
+
+
+@app.get("/api/equipes/{ibge}/export.pdf")
+def exportar_equipes_pdf(ibge: str) -> Response:
+    """Exporta as worklists por equipe em PDF (download)."""
+    avaliacao = repo.avaliar(ibge)
+    nome = avaliacao.municipio if avaliacao else ibge
+    pendencias = analisar_equipes(gerar_amostra_sintetica())
+    pdf = worklist_para_pdf(pendencias, municipio=nome)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="worklist_{ibge}.pdf"'},
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -177,12 +224,17 @@ def dashboard(request: Request) -> HTMLResponse:
 def pagina_municipio(request: Request, ibge: str) -> HTMLResponse:
     """Pagina detalhada de um municipio com prioridades de esforco."""
     avaliacao = repo.avaliar(ibge)
+    registro = repo.obter(ibge)
     if avaliacao is None:
         raise HTTPException(status_code=404, detail="Municipio nao encontrado")
+    q2024 = avaliar_qualidade_2024(
+        isf=avaliacao.isf,
+        equipes={k: int(v) for k, v in (registro or {}).get("equipes", {}).items()},
+    )
     return TEMPLATES.TemplateResponse(
         request,
         "municipio.html",
-        {"a": avaliacao, "prioridades": avaliacao.prioridades()},
+        {"a": avaliacao, "prioridades": avaliacao.prioridades(), "q2024": q2024},
     )
 
 

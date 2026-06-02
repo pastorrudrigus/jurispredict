@@ -1,39 +1,62 @@
 """Cliente para obter dados de desempenho da APS no DataSUS / Dados Abertos do SUS.
 
-Duas fontes sao suportadas:
+Fonte principal (VERIFICADA em 2026): API de Dados Abertos do SUS (DEMAS), que
+substituiu o antigo CKAN. Endpoint REST publico, sem autenticacao:
 
-  1. API de Dados Abertos do SUS (CKAN) -- dataset "indicadores_desempenho_sisab":
-         https://dadosabertos.saude.gov.br/dataset/indicadores_desempenho_sisab
-         API:  https://apidadosabertos.saude.gov.br/api/3/action/...
-     Contem a serie historica nacional (2018-2024) com desagregacao municipal.
+    GET https://apidadosabertos.saude.gov.br
+        /atencao-primaria/indicador-desempenho-programa-previne-brasil
+        ?codigo_municipio=520870&quadrimestre=2024Q2&limit=...&offset=...
 
-  2. CSV exportado do painel publico do SISAB (Excel/CSV/ODS), sem autenticacao:
-         https://sisab.saude.gov.br/.../indicadorPainel.xhtml
+Resposta: {"sisab_indicador_desempenho": [ { ... }, ... ]}, um objeto por
+indicador x visao_equipe (homologadas | validas | geral).
 
-Observacoes importantes:
-  - A atualizacao oficial e quadrimestral (defasagem de ~2 a 4 meses).
-  - O acesso programatico via CKAN funciona, mas a documentacao de endpoints e
-    esparsa; por isso o mapeamento de colunas e configuravel (CAMPOS_SISAB).
-  - Se nao houver rede, use previne.repository (dados de exemplo) para demonstrar.
+Detalhes importantes (observados na pratica):
+  - codigo_municipio usa o IBGE de 6 DIGITOS (sem o digito verificador).
+    Goiania 5208707 -> 520870. Enviar 7 digitos retorna 200 com lista VAZIA.
+  - O campo `percentual` da API e ambiguo (aparece constante entre indicadores do
+    mesmo grupo); por isso calculamos o resultado como numerador/denominador.
+  - O mapeamento codigo_tipo_indicador -> I1..I7 e configuravel (CODIGO_TIPO_*)
+    e deve ser validado contra a Nota Tecnica oficial antes de uso normativo.
+  - Cobertura atual: 2024Q1..2024Q3 (serie historica do Previne Brasil ate 2024).
+  - O servidor pode apresentar erro de TLS intermitente; ha retry com backoff.
+
+Fonte alternativa: CSV exportado do painel do SISAB (parse_csv_sisab). O painel
+detalhado (indicadorPainel.xhtml) exige login no e-Gestor APS e fluxo com
+JSESSIONID + ViewState (JSF), portanto nao e um GET simples.
 """
 
 from __future__ import annotations
 
 import csv
 import io
-from dataclasses import dataclass
+import time
 
 import httpx
 
 from previne.calculator import ResultadoIndicador
 
 
-# Endpoint base da API de Dados Abertos do SUS (CKAN).
-CKAN_BASE = "https://apidadosabertos.saude.gov.br"
-DATASET_INDICADORES = "indicadores_desempenho_sisab"
+# Endpoint REST da API de Dados Abertos do SUS (DEMAS).
+DEMAS_BASE = "https://apidadosabertos.saude.gov.br"
+ENDPOINT_PREVINE = "/atencao-primaria/indicador-desempenho-programa-previne-brasil"
 
-# Mapeamento dos codigos de indicador deste projeto -> rotulos comuns no SISAB.
-# Ajuste conforme o cabecalho real do arquivo baixado.
+# Mapeamento codigo_tipo_indicador (SISAB) -> codigo deste projeto.
+# ATENCAO: validar contra a Nota Tecnica oficial. O codigo 60 (I6 hipertensos)
+# pode nao constar em todos os quadrimestres/municipios do dataset publico.
+CODIGO_TIPO_INDICADOR: dict[int, str] = {
+    10: "I1",  # pre-natal (6+ consultas)
+    20: "I2",  # sifilis e HIV em gestantes
+    30: "I3",  # odontologico em gestantes
+    40: "I4",  # citopatologico
+    50: "I5",  # vacinacao infantil
+    60: "I6",  # hipertensos
+    70: "I7",  # diabeticos
+}
+
+# Visao de equipe usada por padrao (base de pagamento usa equipes homologadas).
+VISAO_PADRAO = "homologadas"
+
+# Mapeamento de colunas para o parser de CSV do painel do SISAB (fallback).
 CAMPOS_SISAB: dict[str, tuple[str, ...]] = {
     "I1": ("pre-natal", "pre natal", "prenatal", "6 consultas"),
     "I2": ("sifilis", "hiv"),
@@ -45,21 +68,40 @@ CAMPOS_SISAB: dict[str, tuple[str, ...]] = {
 }
 
 
-@dataclass
-class RecursoCKAN:
-    """Metadados de um recurso (arquivo) publicado em um dataset CKAN."""
+def ibge6(codigo_ibge: str | int) -> int:
+    """Converte um codigo IBGE de 7 digitos para os 6 digitos exigidos pela API."""
+    digitos = "".join(ch for ch in str(codigo_ibge) if ch.isdigit())
+    if len(digitos) == 7:
+        digitos = digitos[:6]  # remove o digito verificador
+    return int(digitos)
 
-    id: str
-    nome: str
-    formato: str
-    url: str
+
+def _resultado_de_registro(reg: dict) -> ResultadoIndicador | None:
+    """Converte um registro da API em ResultadoIndicador (resultado = num/den)."""
+    codigo = CODIGO_TIPO_INDICADOR.get(int(reg.get("codigo_tipo_indicador", -1)))
+    if codigo is None:
+        return None
+    numerador = reg.get("numerador")
+    denominador = reg.get("denominador_identificado") or reg.get("denominador_utilizador")
+    if not denominador:
+        return None
+    resultado = round(float(numerador) / float(denominador) * 100.0, 1)
+    return ResultadoIndicador(
+        codigo=codigo,
+        resultado=resultado,
+        numerador=int(numerador),
+        denominador=int(denominador),
+    )
 
 
 class DataSUSClient:
-    """Cliente HTTP para a API de Dados Abertos do SUS (CKAN)."""
+    """Cliente HTTP para a API de Dados Abertos do SUS (DEMAS)."""
 
-    def __init__(self, base_url: str = CKAN_BASE, timeout: float = 30.0) -> None:
+    def __init__(
+        self, base_url: str = DEMAS_BASE, timeout: float = 30.0, tentativas: int = 4
+    ) -> None:
         self.base_url = base_url.rstrip("/")
+        self.tentativas = tentativas
         self._client = httpx.Client(timeout=timeout, follow_redirects=True)
 
     def __enter__(self) -> "DataSUSClient":
@@ -71,46 +113,62 @@ class DataSUSClient:
     def close(self) -> None:
         self._client.close()
 
-    def _action(self, action: str, **params: object) -> dict:
-        """Chama uma action da API CKAN (ex.: package_show, datastore_search)."""
-        url = f"{self.base_url}/api/3/action/{action}"
-        resp = self._client.get(url, params=params)
-        resp.raise_for_status()
-        payload = resp.json()
-        if not payload.get("success", False):
-            raise RuntimeError(f"CKAN action '{action}' falhou: {payload}")
-        return payload["result"]
+    def _get(self, path: str, params: dict) -> httpx.Response:
+        """GET com retry e backoff exponencial (o servidor tem TLS intermitente)."""
+        ultimo_erro: Exception | None = None
+        for i in range(self.tentativas):
+            try:
+                resp = self._client.get(f"{self.base_url}{path}", params=params)
+                resp.raise_for_status()
+                return resp
+            except (httpx.TransportError, httpx.HTTPStatusError) as e:
+                ultimo_erro = e
+                if i < self.tentativas - 1:
+                    time.sleep(2 ** i)
+        raise RuntimeError(f"Falha ao acessar {path}: {ultimo_erro}")
 
-    def listar_recursos(self, dataset: str = DATASET_INDICADORES) -> list[RecursoCKAN]:
-        """Lista os recursos (arquivos) de um dataset CKAN."""
-        result = self._action("package_show", id=dataset)
-        recursos = []
-        for r in result.get("resources", []):
-            recursos.append(
-                RecursoCKAN(
-                    id=r.get("id", ""),
-                    nome=r.get("name", ""),
-                    formato=(r.get("format", "") or "").upper(),
-                    url=r.get("url", ""),
-                )
-            )
-        return recursos
+    def buscar_indicadores_previne(
+        self,
+        codigo_ibge: str | int,
+        *,
+        quadrimestre: str = "2024Q2",
+        visao: str = VISAO_PADRAO,
+        limit: int = 100,
+    ) -> list[ResultadoIndicador]:
+        """Busca os indicadores do Previne Brasil de um municipio (dados reais).
 
-    def buscar_datastore(
-        self, resource_id: str, *, q: str | None = None, limit: int = 1000
-    ) -> list[dict]:
-        """Consulta registros de um recurso via datastore_search (se indexado)."""
-        params: dict[str, object] = {"resource_id": resource_id, "limit": limit}
-        if q:
-            params["q"] = q
-        result = self._action("datastore_search", **params)
-        return result.get("records", [])
+        Args:
+            codigo_ibge: codigo IBGE (6 ou 7 digitos; convertido automaticamente).
+            quadrimestre: ex.: "2024Q1", "2024Q2", "2024Q3".
+            visao: "homologadas" (padrao), "validas" ou "geral".
+            limit: maximo de registros por pagina.
+
+        Returns:
+            Lista de ResultadoIndicador (resultado = numerador/denominador*100).
+        """
+        resp = self._get(
+            ENDPOINT_PREVINE,
+            {"codigo_municipio": ibge6(codigo_ibge), "quadrimestre": quadrimestre, "limit": limit},
+        )
+        registros = resp.json().get("sisab_indicador_desempenho", [])
+        resultados: list[ResultadoIndicador] = []
+        for reg in registros:
+            if reg.get("visao_equipe") != visao:
+                continue
+            r = _resultado_de_registro(reg)
+            if r is not None:
+                resultados.append(r)
+        return resultados
 
     def baixar_csv(self, url: str) -> str:
         """Baixa o conteudo bruto de um arquivo (CSV) por URL."""
+        resp = self._get_absoluto(url)
+        return resp.text
+
+    def _get_absoluto(self, url: str) -> httpx.Response:
         resp = self._client.get(url)
         resp.raise_for_status()
-        return resp.text
+        return resp
 
 
 # --------------------------------------------------------------------------- #

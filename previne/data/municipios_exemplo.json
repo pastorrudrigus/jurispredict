@@ -3,16 +3,16 @@
     "ibge": "5208707",
     "municipio": "Goiania",
     "uf": "GO",
-    "_obs": "Numeros ilustrativos (estimados) ate conexao ao vivo com o SISAB; perfil de capital com ~1,5 mi hab.",
+    "_obs": "Indicadores I1-I5 e I7: dados REAIS 2024Q2 (visao homologadas) da API do DEMAS, resultado = numerador/denominador. I6 (hipertensos) nao consta no dataset publico deste quadrimestre -> estimado e sinalizado. Quantidade de equipes: estimada (CNES nao integrado).",
     "equipes": { "eSF": 232, "eAP30": 18, "eAP20": 10 },
     "resultados": [
-      { "codigo": "I1", "resultado": 38.2, "numerador": 5340, "denominador": 13979 },
-      { "codigo": "I2", "resultado": 52.4, "numerador": 7325, "denominador": 13979 },
-      { "codigo": "I3", "resultado": 24.1, "numerador": 3369, "denominador": 13979 },
-      { "codigo": "I4", "resultado": 28.7, "numerador": 61200, "denominador": 213240 },
-      { "codigo": "I5", "resultado": 82.3, "numerador": 16800, "denominador": 20413 },
-      { "codigo": "I6", "resultado": 36.4, "numerador": 58900, "denominador": 161813 },
-      { "codigo": "I7", "resultado": 38.9, "numerador": 22100, "denominador": 56812 }
+      { "codigo": "I1", "resultado": 51.8, "numerador": 1483, "denominador": 2864 },
+      { "codigo": "I2", "resultado": 72.1, "numerador": 2064, "denominador": 2864 },
+      { "codigo": "I3", "resultado": 41.7, "numerador": 1194, "denominador": 2864 },
+      { "codigo": "I4", "resultado": 19.1, "numerador": 52556, "denominador": 274777 },
+      { "codigo": "I5", "resultado": 79.5, "numerador": 2737, "denominador": 3441 },
+      { "codigo": "I6", "resultado": 36.4, "numerador": 58900, "denominador": 161813, "_estimado": true },
+      { "codigo": "I7", "resultado": 18.6, "numerador": 9874, "denominador": 53069 }
     ]
   },
   {

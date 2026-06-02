@@ -63,17 +63,38 @@ A avaliação é **quadrimestral** (4 meses).
 
 ## Os dados são públicos?
 
-**Sim.** Tudo é aberto e gratuito:
+**Sim.** Há uma **API REST pública e sem autenticação** (verificada em 2026). O
+antigo CKAN saiu do ar; os dados migraram para a **API de Dados Abertos do SUS
+(DEMAS)**:
+
+```
+GET https://apidadosabertos.saude.gov.br
+    /atencao-primaria/indicador-desempenho-programa-previne-brasil
+    ?codigo_municipio=520870&quadrimestre=2024Q2
+```
 
 | Fonte | Conteúdo | Acesso |
 |-------|----------|--------|
-| [Dados Abertos do SUS (CKAN)](https://dadosabertos.saude.gov.br/dataset/indicadores_desempenho_sisab) | Série histórica nacional 2018–2024, por município/quadrimestre | API CKAN / download CSV |
-| [Painel público do SISAB](https://sisab.saude.gov.br) | Resultados atuais por município, equipe e quadrimestre | Download CSV/Excel/ODS, sem login |
-| [CNES](https://cnes.datasus.gov.br) | Nº de equipes por município (necessário ao cálculo do repasse) | Download |
+| [API DEMAS](https://apidadosabertos.saude.gov.br/v1/) | Indicadores do Previne Brasil por município/quadrimestre (2024) | **REST JSON, sem login** |
+| [Painel do SISAB](https://sisab.saude.gov.br) | Painel detalhado por equipe | Login no e-Gestor + sessão JSF |
+| [CNES](https://cnes.datasus.gov.br) | Nº de equipes por município (necessário ao repasse) | Download |
 
-**Limitações práticas:** a atualização é quadrimestral (defasagem de ~2 a 4
-meses) e a API CKAN tem documentação esparsa — por isso o cliente também aceita
-CSV exportado do painel do SISAB. Veja [`previne/datasus.py`](previne/datasus.py).
+**Detalhes importantes** (embutidos em [`previne/datasus.py`](previne/datasus.py)):
+
+- O `codigo_municipio` usa o **IBGE de 6 dígitos** (sem dígito verificador):
+  Goiânia `5208707` → `520870`. Enviar 7 dígitos retorna lista **vazia** (200).
+- O campo `percentual` da API é ambíguo → o resultado é calculado como
+  **numerador/denominador**.
+- O mapeamento `codigo_tipo_indicador` (10,20,…,70) → I1…I7 é configurável e deve
+  ser validado contra a Nota Técnica oficial.
+- Cobertura atual: 2024Q1–Q3. A atualização é quadrimestral (defasagem ~2–4 meses).
+- O servidor tem TLS intermitente → o cliente faz **retry com backoff**.
+
+Para puxar dados reais de um município:
+
+```bash
+python -m previne.ingest municipio 5208707 --quadrimestre 2024Q2
+```
 
 ---
 
@@ -86,9 +107,11 @@ previne/                  núcleo de domínio (puro Python, testável, sem rede)
 ├── calculator.py         notas, ISF, repasse e ANÁLISE DE LACUNAS (agregado)
 ├── patient.py            análise em NÍVEL DE PACIENTE + instruções por equipe
 ├── convenio.py           conector autorizado ao DataSUS (LGPD + pseudonimização)
-├── datasus.py            cliente CKAN/DataSUS + parser de CSV do SISAB (agregado)
+├── modelo2024.py         Componente de Qualidade 2024 (faixas Excelente…Regular)
+├── export.py             exportação das worklists em CSV e PDF (PDF sem deps)
+├── datasus.py            cliente da API DEMAS + parser de CSV do SISAB
 ├── repository.py         carga de dados (exemplo embarcado ou JSON externo)
-├── ingest.py             CLI de ingestão de dados do DataSUS
+├── ingest.py             CLI de ingestão de dados reais do DataSUS
 └── data/                 conjunto de exemplo (roda offline)
 
 api/                      camada web (FastAPI)
@@ -133,7 +156,11 @@ pytest
 | GET | `/api/municipios` | Avaliação resumida de todos |
 | GET | `/api/municipio/{ibge}` | Avaliação completa de um município |
 | POST | `/api/simular` | Simula uma avaliação a partir de dados informados |
+| GET | `/api/municipio/{ibge}/modelo2024` | Avaliação na faixa do modelo 2024 |
+| GET | `/api/faixas2024` | Faixas de qualidade e valores de referência |
 | GET | `/api/equipes/{ibge}` | Pendências por equipe em nível de paciente |
+| GET | `/api/equipes/{ibge}/export.csv` | Download das worklists em CSV |
+| GET | `/api/equipes/{ibge}/export.pdf` | Download das worklists em PDF |
 
 Exemplo de simulação:
 
@@ -214,21 +241,53 @@ python -m previne.ingest csv export_sisab.csv --saida data/municipios.json
 
 ---
 
+## Modelo 2024 (Componente de Qualidade)
+
+Pela Portaria GM/MS nº 3.493/2024, o desempenho passa a definir uma **faixa de
+qualidade**, com valor mensal por equipe (valores de referência para a eSF):
+
+| Faixa | ISF mínimo (ref.) | Valor mensal eSF |
+|-------|:-----------------:|-----------------:|
+| Excelente | 8,0 | R$ 3.000 |
+| Bom | 6,0 | R$ 2.500 |
+| Suficiente | 4,0 | R$ 2.000 |
+| Regular | 0,0 | R$ 1.000 |
+
+> **Transição:** até dez/2025 todos os municípios são classificados como "Bom".
+> A classificação por desempenho real vale a partir de **jan/2026**. Os pontos de
+> corte acima são referência configurável e devem ser validados contra a norma
+> vigente. Ver [`previne/modelo2024.py`](previne/modelo2024.py).
+
+## Exportação das worklists (CSV/PDF)
+
+As listas de ação por equipe podem ser baixadas direto da página `/equipes/{ibge}`
+ou via API:
+
+```
+GET /api/equipes/{ibge}/export.csv     # planilha
+GET /api/equipes/{ibge}/export.pdf     # relatório para imprimir e distribuir
+```
+
+O PDF é gerado em **Python puro, sem dependências externas** (ver
+[`previne/export.py`](previne/export.py)) — importante para auditabilidade.
+
 ## Exemplo: Goiânia/GO (IBGE 5208707)
 
-Números **ilustrativos** (estimados até a conexão ao vivo com o SISAB), perfil de
-capital com ~1,5 mi de habitantes e 232 eSF + 18 eAP30 + 10 eAP20:
+Indicadores I1–I5 e I7 são **dados REAIS de 2024Q2** (visão homologadas) puxados
+da API do DEMAS; I6 (hipertensos) não consta no dataset público desse
+quadrimestre e está sinalizado como estimado. Equipes: estimadas (CNES não
+integrado) — 232 eSF + 18 eAP30 + 10 eAP20.
 
 | Métrica | Valor |
 |---------|------:|
-| ISF | **7,21** / 10 |
-| Repasse atual / quadrimestre | R$ 2.329.774,35 |
-| Repasse máximo | R$ 3.231.450,00 |
-| **Deixado na mesa / quadrimestre** | **R$ 901.675,65** |
-| Projeção anual (×3 quadrimestres) | ≈ R$ 2,7 milhões |
+| ISF | **7,37** / 10 |
+| Repasse atual / quadrimestre (modelo 2022) | R$ 2.381.315,03 |
+| **Deixado na mesa / quadrimestre** | **R$ 850.134,97** |
+| Faixa no modelo 2024 | **Bom** (R$ 2,5 mi/quad; teto Excelente ≈ R$ 3,0 mi) |
 
-Maior oportunidade: **atendimento odontológico a gestantes** (24,1% vs. meta 60%)
-— sozinho vale ≈ R$ 387 mil por quadrimestre.
+Indicadores reais: I1 pré-natal **51,8%** (meta 45 ✓), I2 sífilis/HIV **72,1%**
+(meta 60 ✓), I3 odonto gestante **41,7%**, I4 citopatológico **19,1%**, I5 vacina
+**79,5%**, I7 diabéticos **18,6%**. Maiores oportunidades: I4 e I7.
 
 ## Viabilidade (resumo)
 
@@ -239,8 +298,8 @@ Maior oportunidade: **atendimento odontológico a gestantes** (24,1% vs. meta 60
 | Reprodutibilidade do cálculo | **Total** — fórmula do ISF é pública |
 | Cálculo antecipado do ganho | **Sim** — aritmética direta sobre metas e nº de equipes |
 | Cobertura nacional | **~5.570 municípios** |
-| Acesso programático | **Médio** — CKAN funciona mas é pouco documentado; CSV é confiável |
-| Atualização em tempo real | **Baixa** — cadência quadrimestral |
+| Acesso programático | **Alta** — API REST pública do DEMAS, sem autenticação |
+| Atualização em tempo real | **Baixa** — cadência quadrimestral (defasagem ~2–4 meses) |
 
 ---
 

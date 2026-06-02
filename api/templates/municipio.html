@@ -23,6 +23,30 @@
     </div>
   </div>
 
+  <h3>Modelo 2024 (Componente de Qualidade)</h3>
+  <p>
+    Pela Portaria GM/MS nº 3.493/2024, o repasse passa a depender da
+    <strong>faixa de qualidade</strong>. Classificação por desempenho real vale a
+    partir de jan/2026.
+    {% if q2024.em_transicao %}
+      <span class="pill medio">regra de transição: classificado como "Bom"</span>
+    {% endif %}
+  </p>
+  <div class="cards">
+    <div class="card">
+      <div class="rotulo">Faixa atual</div>
+      <div class="valor">{{ q2024.faixa }}</div>
+    </div>
+    <div class="card">
+      <div class="rotulo">Repasse qualidade / quadrimestre</div>
+      <div class="valor">{{ q2024.repasse_quadrimestre | brl }}</div>
+    </div>
+    <div class="card">
+      <div class="rotulo">Se atingir "Excelente"</div>
+      <div class="valor ganho">{{ q2024.repasse_se_excelente | brl }}</div>
+    </div>
+  </div>
+
   <h3>Onde priorizar o esforço</h3>
   <p>
     Indicadores ordenados pelo <strong>maior ganho financeiro</strong> ao atingir
