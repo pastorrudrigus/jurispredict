@@ -39,6 +39,7 @@ from previne.calculator import ResultadoIndicador
 # Endpoint REST da API de Dados Abertos do SUS (DEMAS).
 DEMAS_BASE = "https://apidadosabertos.saude.gov.br"
 ENDPOINT_PREVINE = "/atencao-primaria/indicador-desempenho-programa-previne-brasil"
+ENDPOINT_CADASTRO = "/atencao-primaria/cadastro-vinculado-programa-previne-brasil"
 
 # Mapeamento codigo_tipo_indicador (SISAB) -> codigo deste projeto.
 # ATENCAO: validar contra a Nota Tecnica oficial. O codigo 60 (I6 hipertensos)
@@ -159,6 +160,41 @@ class DataSUSClient:
             if r is not None:
                 resultados.append(r)
         return resultados
+
+    def pessoas_vinculadas(
+        self, codigo_ibge: str | int, *, competencia: int | None = None, situacao: str = "homologadas"
+    ) -> dict[str, float]:
+        """Retorna as pessoas vinculadas por tipo de equipe (dado real do SISAB).
+
+        Fonte: cadastro-vinculado (base da Capitacao Ponderada). Permite estimar o
+        numero de equipes (ver previne.cnes.estimar_equipes).
+
+        Args:
+            codigo_ibge: codigo IBGE (6 ou 7 digitos).
+            competencia: AAAAMM; se None, usa a competencia mais recente disponivel.
+            situacao: "homologadas" (padrao), "validas" etc.
+
+        Returns:
+            Mapa {sigla_equipe: total_pessoas_vinculadas}, ex.: {"eSF": 716272.0}.
+        """
+        resp = self._get(
+            ENDPOINT_CADASTRO, {"codigo_municipio_ibge": ibge6(codigo_ibge), "limit": 1000}
+        )
+        registros = resp.json().get("sisab_cadastro_vinculado", [])
+        registros = [r for r in registros if r.get("situacao_equipe") == situacao]
+        if not registros:
+            return {}
+        if competencia is None:
+            competencia = max(r["competencia_referencia"] for r in registros)
+        por_sigla: dict[str, float] = {}
+        for r in registros:
+            if r.get("competencia_referencia") != competencia:
+                continue
+            sigla = r.get("sigla_equipe", "")
+            por_sigla[sigla] = por_sigla.get(sigla, 0.0) + float(
+                r.get("pessoas_vinculadas_equipe_municipio") or 0
+            )
+        return por_sigla
 
     def baixar_csv(self, url: str) -> str:
         """Baixa o conteudo bruto de um arquivo (CSV) por URL."""

@@ -25,6 +25,7 @@ from previne.patient import (
     gerar_amostra_sintetica,
 )
 from previne.convenio import Convenio, ConvenioDataSUS, pseudonimizar
+from previne.cnes import estimar_equipes, equipes_estimadas_municipio, parse_cnes_equipes_csv
 
 __all__ = [
     "INDICADORES",
@@ -41,6 +42,9 @@ __all__ = [
     "Convenio",
     "ConvenioDataSUS",
     "pseudonimizar",
+    "estimar_equipes",
+    "equipes_estimadas_municipio",
+    "parse_cnes_equipes_csv",
 ]
 
 __version__ = "0.1.0"

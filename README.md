@@ -90,11 +90,26 @@ GET https://apidadosabertos.saude.gov.br
 - Cobertura atual: 2024Q1–Q3. A atualização é quadrimestral (defasagem ~2–4 meses).
 - O servidor tem TLS intermitente → o cliente faz **retry com backoff**.
 
-Para puxar dados reais de um município:
+Para puxar dados reais de um município (indicadores **+ equipes do CNES**):
 
 ```bash
 python -m previne.ingest municipio 5208707 --quadrimestre 2024Q2
 ```
+
+### Nº de equipes (CNES)
+
+O repasse total depende do número de equipes. A API **não expõe a contagem de
+equipes**, mas expõe as **pessoas vinculadas por tipo** (base da Capitação
+Ponderada) — um dado real. [`previne/cnes.py`](previne/cnes.py) oferece três vias:
+
+1. **Estimativa fundamentada (real):** pessoas vinculadas ÷ população de referência
+   por equipe (~3.000). Validado em Goiânia: 963.579 vinculados eSF → **321 eSF**.
+2. **Contagem exata (oficial):** `parse_cnes_equipes_csv()` conta equipes distintas
+   por tipo no extrato público da base do CNES (`tbEquipe`).
+3. **Manual:** o gestor informa o número de equipes.
+
+> A API só traz "eAP" (sem distinguir 30h/20h) → tratado como eAP30 por padrão; a
+> carga horária exata vem da base do CNES.
 
 ---
 
@@ -109,6 +124,7 @@ previne/                  núcleo de domínio (puro Python, testável, sem rede)
 ├── convenio.py           conector autorizado ao DataSUS (LGPD + pseudonimização)
 ├── modelo2024.py         Componente de Qualidade 2024 (faixas Excelente…Regular)
 ├── export.py             exportação das worklists em CSV e PDF (PDF sem deps)
+├── cnes.py               nº de equipes por município (estimativa real + base CNES)
 ├── datasus.py            cliente da API DEMAS + parser de CSV do SISAB
 ├── repository.py         carga de dados (exemplo embarcado ou JSON externo)
 ├── ingest.py             CLI de ingestão de dados reais do DataSUS
@@ -296,15 +312,16 @@ O PDF é gerado em **Python puro, sem dependências externas** (ver
 
 Indicadores I1–I5 e I7 são **dados REAIS de 2024Q2** (visão homologadas) puxados
 da API do DEMAS; I6 (hipertensos) não consta no dataset público desse
-quadrimestre e está sinalizado como estimado. Equipes: estimadas (CNES não
-integrado) — 232 eSF + 18 eAP30 + 10 eAP20.
+quadrimestre e está sinalizado como estimado. Equipes **estimadas a partir das
+pessoas vinculadas reais** (CNES, cadastro-vinculado 202412): **321 eSF + 86 eAP**.
 
 | Métrica | Valor |
 |---------|------:|
 | ISF | **7,37** / 10 |
-| Repasse atual / quadrimestre (modelo 2022) | R$ 2.381.315,03 |
-| **Deixado na mesa / quadrimestre** | **R$ 850.134,97** |
-| Faixa no modelo 2024 | **Bom** (R$ 2,5 mi/quad; teto Excelente ≈ R$ 3,0 mi) |
+| Repasse atual / quadrimestre (modelo 2022) | R$ 3.664.658,46 |
+| **Deixado na mesa / quadrimestre** | **R$ 1.308.291,54** |
+| Projeção anual (×3) | ≈ **R$ 3,9 milhões** |
+| Faixa no modelo 2024 | **Bom** (R$ 3,86 mi/quad) |
 
 Indicadores reais: I1 pré-natal **51,8%** (meta 45 ✓), I2 sífilis/HIV **72,1%**
 (meta 60 ✓), I3 odonto gestante **41,7%**, I4 citopatológico **19,1%**, I5 vacina

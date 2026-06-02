@@ -22,11 +22,15 @@ from previne.datasus import DataSUSClient, parse_csv_sisab
 
 
 def _cmd_municipio(args: argparse.Namespace) -> int:
-    """Busca os indicadores reais de um municipio na API do DEMAS."""
+    """Busca indicadores reais + estima equipes (CNES) de um municipio."""
+    from previne.cnes import estimar_equipes
+
     with DataSUSClient() as cli:
         resultados = cli.buscar_indicadores_previne(
             args.ibge, quadrimestre=args.quadrimestre, visao=args.visao
         )
+        vinculados = cli.pessoas_vinculadas(args.ibge)
+    equipes = estimar_equipes(vinculados)
     if not resultados:
         print("Nenhum indicador retornado (verifique IBGE/quadrimestre ou a rede).")
         return 1
@@ -35,12 +39,13 @@ def _cmd_municipio(args: argparse.Namespace) -> int:
             f"{r.codigo}  resultado={r.resultado:5.1f}%  "
             f"({r.numerador}/{r.denominador})  meta={r.indicador.meta:.0f}%"
         )
+    print(f"\nEquipes estimadas (pessoas vinculadas / referencia): {equipes}")
     if args.saida:
         registro = {
             "ibge": str(args.ibge),
             "municipio": str(args.ibge),
             "uf": "",
-            "equipes": {},
+            "equipes": equipes,
             "resultados": [
                 {
                     "codigo": r.codigo,
@@ -54,7 +59,10 @@ def _cmd_municipio(args: argparse.Namespace) -> int:
         Path(args.saida).write_text(
             json.dumps([registro], ensure_ascii=False, indent=2), encoding="utf-8"
         )
-        print(f"\nGravado em {args.saida}. Complete 'municipio', 'uf' e 'equipes' (CNES).")
+        print(
+            f"\nGravado em {args.saida}. Indicadores e equipes (estimadas) ja preenchidos; "
+            "complete 'municipio'/'uf' e, se quiser, a contagem exata via base do CNES."
+        )
     return 0
 
 

@@ -3,8 +3,8 @@
     "ibge": "5208707",
     "municipio": "Goiania",
     "uf": "GO",
-    "_obs": "Indicadores I1-I5 e I7: dados REAIS 2024Q2 (visao homologadas) da API do DEMAS, resultado = numerador/denominador. I6 (hipertensos) nao consta no dataset publico deste quadrimestre -> estimado e sinalizado. Quantidade de equipes: estimada (CNES nao integrado).",
-    "equipes": { "eSF": 232, "eAP30": 18, "eAP20": 10 },
+    "_obs": "Indicadores I1-I5 e I7: dados REAIS 2024Q2 (visao homologadas) da API do DEMAS, resultado = numerador/denominador. I6 (hipertensos) nao consta no dataset publico deste quadrimestre -> estimado e sinalizado. Equipes: ESTIMADAS a partir das pessoas vinculadas reais (cadastro-vinculado 202412: 963.579 eSF + 256.568 eAP) / 3.000 por equipe. Contagem exata via base do CNES (previne.cnes.parse_cnes_equipes_csv).",
+    "equipes": { "eSF": 321, "eAP30": 86 },
     "resultados": [
       { "codigo": "I1", "resultado": 51.8, "numerador": 1483, "denominador": 2864 },
       { "codigo": "I2", "resultado": 72.1, "numerador": 2064, "denominador": 2864 },
