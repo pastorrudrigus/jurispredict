@@ -1,0 +1,62 @@
+[
+  {
+    "ibge": "2312908",
+    "municipio": "Sobral",
+    "uf": "CE",
+    "equipes": { "eSF": 62, "eAP30": 4, "eAP20": 2 },
+    "resultados": [
+      { "codigo": "I1", "resultado": 58.4, "numerador": 1240, "denominador": 2123 },
+      { "codigo": "I2", "resultado": 71.2, "numerador": 1511, "denominador": 2123 },
+      { "codigo": "I3", "resultado": 49.8, "numerador": 1057, "denominador": 2123 },
+      { "codigo": "I4", "resultado": 38.6, "numerador": 9210, "denominador": 23860 },
+      { "codigo": "I5", "resultado": 88.1, "numerador": 2740, "denominador": 3110 },
+      { "codigo": "I6", "resultado": 41.3, "numerador": 7820, "denominador": 18934 },
+      { "codigo": "I7", "resultado": 44.7, "numerador": 3190, "denominador": 7137 }
+    ]
+  },
+  {
+    "ibge": "3304557",
+    "municipio": "Rio de Janeiro",
+    "uf": "RJ",
+    "equipes": { "eSF": 1240, "eAP30": 85, "eAP20": 40 },
+    "resultados": [
+      { "codigo": "I1", "resultado": 32.1, "numerador": 18900, "denominador": 58879 },
+      { "codigo": "I2", "resultado": 44.5, "numerador": 26201, "denominador": 58879 },
+      { "codigo": "I3", "resultado": 21.7, "numerador": 12777, "denominador": 58879 },
+      { "codigo": "I4", "resultado": 24.9, "numerador": 198400, "denominador": 796787 },
+      { "codigo": "I5", "resultado": 79.3, "numerador": 71800, "denominador": 90542 },
+      { "codigo": "I6", "resultado": 33.8, "numerador": 210400, "denominador": 622485 },
+      { "codigo": "I7", "resultado": 35.2, "numerador": 78900, "denominador": 224147 }
+    ]
+  },
+  {
+    "ibge": "5300108",
+    "municipio": "Brasilia",
+    "uf": "DF",
+    "equipes": { "eSF": 580, "eAP30": 30, "eAP20": 12 },
+    "resultados": [
+      { "codigo": "I1", "resultado": 47.8, "numerador": 14200, "denominador": 29707 },
+      { "codigo": "I2", "resultado": 63.1, "numerador": 18745, "denominador": 29707 },
+      { "codigo": "I3", "resultado": 38.4, "numerador": 11408, "denominador": 29707 },
+      { "codigo": "I4", "resultado": 41.2, "numerador": 96800, "denominador": 234951 },
+      { "codigo": "I5", "resultado": 91.6, "numerador": 38400, "denominador": 41922 },
+      { "codigo": "I6", "resultado": 46.9, "numerador": 84300, "denominador": 179744 },
+      { "codigo": "I7", "resultado": 48.3, "numerador": 31200, "denominador": 64596 }
+    ]
+  },
+  {
+    "ibge": "2927408",
+    "municipio": "Salvador",
+    "uf": "BA",
+    "equipes": { "eSF": 410, "eAP30": 22, "eAP20": 18 },
+    "resultados": [
+      { "codigo": "I1", "resultado": 28.6, "numerador": 9120, "denominador": 31888 },
+      { "codigo": "I2", "resultado": 39.4, "numerador": 12564, "denominador": 31888 },
+      { "codigo": "I3", "resultado": 17.2, "numerador": 5485, "denominador": 31888 },
+      { "codigo": "I4", "resultado": 22.1, "numerador": 92300, "denominador": 417647 },
+      { "codigo": "I5", "resultado": 74.8, "numerador": 35600, "denominador": 47594 },
+      { "codigo": "I6", "resultado": 29.5, "numerador": 96400, "denominador": 326780 },
+      { "codigo": "I7", "resultado": 31.8, "numerador": 37200, "denominador": 116981 }
+    ]
+  }
+]

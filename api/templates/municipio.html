@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ a.municipio }}/{{ a.uf }} — JurisPredict{% endblock %}
+{% block content %}
+  <a class="voltar" href="/">&larr; Voltar ao ranking</a>
+  <h2>{{ a.municipio }}/{{ a.uf }} <span style="font-weight:400;color:#888">· IBGE {{ a.ibge }}</span></h2>
+
+  <div class="cards">
+    <div class="card">
+      <div class="rotulo">ISF (0 a 10)</div>
+      <div class="valor">{{ "%.2f"|format(a.isf) }}</div>
+    </div>
+    <div class="card">
+      <div class="rotulo">Repasse atual / quadrimestre</div>
+      <div class="valor">{{ a.repasse_atual | brl }}</div>
+    </div>
+    <div class="card">
+      <div class="rotulo">Se atingir todas as metas</div>
+      <div class="valor ganho">{{ a.repasse_maximo | brl }}</div>
+    </div>
+    <div class="card">
+      <div class="rotulo">Deixado na mesa</div>
+      <div class="valor destaque">{{ a.repasse_potencial | brl }}</div>
+    </div>
+  </div>
+
+  <h3>Onde priorizar o esforço</h3>
+  <p>
+    Indicadores ordenados pelo <strong>maior ganho financeiro</strong> ao atingir
+    a meta. A coluna "casos a mais" indica quantos atendimentos/registros
+    adicionais são necessários no quadrimestre.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Indicador</th>
+        <th class="num">Meta</th>
+        <th class="num">Atual</th>
+        <th class="num">Nota</th>
+        <th class="num">Faltam (p.p.)</th>
+        <th class="num">Casos a mais</th>
+        <th class="num">Ganho potencial</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ind in a.indicadores %}
+      <tr>
+        <td>
+          {{ ind.nome }}
+          {% if ind.atingiu_meta %}
+            <span class="pill ok">meta atingida</span>
+          {% endif %}
+        </td>
+        <td class="num">{{ "%.0f"|format(ind.meta) }}%</td>
+        <td class="num">{{ "%.1f"|format(ind.resultado) }}%</td>
+        <td class="num">{{ "%.1f"|format(ind.nota) }}</td>
+        <td class="num">
+          {% if ind.lacuna_pp > 0 %}{{ "%.1f"|format(ind.lacuna_pp) }}{% else %}—{% endif %}
+        </td>
+        <td class="num">
+          {% if ind.casos_adicionais is not none and ind.casos_adicionais > 0 %}
+            +{{ ind.casos_adicionais }}
+          {% else %}—{% endif %}
+        </td>
+        <td class="num {% if ind.ganho_potencial > 0 %}ganho{% endif %}">
+          {% if ind.ganho_potencial > 0 %}{{ ind.ganho_potencial | brl }}{% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p style="margin-top:16px;color:#666;font-size:.9rem">
+    Base de cálculo: soma dos valores máximos das equipes ({{ a.base_mensal | brl }}/mês)
+    × {{ a.meses }} meses do quadrimestre.
+  </p>
+{% endblock %}
