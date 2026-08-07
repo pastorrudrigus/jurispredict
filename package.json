@@ -14,7 +14,8 @@
     "datajud:testar": "npm run coletor:build --silent && node scripts/testar-datajud.cjs",
     "classificador:testar": "npm run coletor:build --silent && node scripts/testar-classificador.cjs",
     "partes:testar": "npm run coletor:build --silent && node scripts/testar-partes.cjs",
-    "demo:leads": "npm run coletor:build --silent && node scripts/demo-leads.cjs"
+    "demo:leads": "npm run coletor:build --silent && node scripts/demo-leads.cjs",
+    "migrations:juntar": "./scripts/juntar-migrations.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",
