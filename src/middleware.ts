@@ -18,7 +18,11 @@ export async function middleware(request: NextRequest) {
   const { pathname: earlyPath } = request.nextUrl;
   // /api/setup e /api/cron se autenticam sozinhas (token e CRON_SECRET),
   // nao passam por Supabase auth.
-  if (earlyPath.startsWith("/api/setup") || earlyPath.startsWith("/api/cron")) {
+  if (
+    earlyPath.startsWith("/api/setup") ||
+    earlyPath.startsWith("/api/cron") ||
+    earlyPath.startsWith("/api/webhook")
+  ) {
     return NextResponse.next();
   }
 
