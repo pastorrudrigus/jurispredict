@@ -25,10 +25,16 @@ async function matchEmpreendimento(
   return linha;
 }
 
+export type ItemLote = {
+  texto: string;
+  /** Data real do anúncio na origem, quando conhecida (ex.: export de grupo). */
+  anunciadoEm?: string | null;
+};
+
 export type LoteInput = {
   fonte: string;
   urlOriginal?: string | null;
-  textos: string[];
+  itens: ItemLote[];
   offsetIndice?: number;
 };
 
@@ -48,8 +54,9 @@ export async function ingerirLote(input: LoteInput): Promise<ResultadoItem[]> {
   const offset = input.offsetIndice ?? 0;
   const resultados: ResultadoItem[] = [];
 
-  for (let i = 0; i < input.textos.length; i++) {
-    const texto = input.textos[i].trim();
+  for (let i = 0; i < input.itens.length; i++) {
+    const texto = input.itens[i].texto.trim();
+    const anunciadoEm = input.itens[i].anunciadoEm ?? null;
     const indice = offset + i;
     const trecho = texto.slice(0, 140);
 
@@ -100,6 +107,7 @@ export async function ingerirLote(input: LoteInput): Promise<ResultadoItem[]> {
           status: extraido.eh_repasse ? "novo" : "invalido",
           extraido_em: new Date().toISOString(),
           modelo_extracao: MODELO_EXTRACAO,
+          anunciado_em: anunciadoEm,
         })
         .select(
           "*, empreendimentos(id, nome, construtora, bairro, data_entrega_prevista)",

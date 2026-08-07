@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { atualizarStatus } from "@/app/actions/leads";
-import { brl, corScore, dataBR, deltaTexto, tempoRelativo } from "@/lib/format";
+import { brl, corScore, dataBR, deltaTexto, idadeLead } from "@/lib/format";
 import { linkWhatsApp, pitchIndividual } from "@/lib/pitch";
 import { STATUS, type Lead } from "@/lib/types";
 import BotaoCopiar from "./BotaoCopiar";
@@ -58,7 +58,7 @@ export default function DrawerLead({
             </h2>
             <p className="text-xs text-zinc-500">
               {lead.bairro ?? lead.empreendimentos?.bairro ?? "bairro não informado"} ·{" "}
-              {lead.fonte} · captado {tempoRelativo(lead.criado_em)}
+              {lead.fonte} · captado {idadeLead(lead)}
             </p>
           </div>
           <button type="button" className="btn" onClick={aoFechar}>

@@ -9,3 +9,4 @@ out
 next-env.d.ts
 tsconfig.tsbuildinfo
 .vercel
+.tmp-cli

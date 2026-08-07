@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "coletor:build": "tsc src/lib/coletores/whatsapp.ts src/lib/extracao.ts src/lib/pitch.ts --outDir .tmp-cli --module commonjs --target es2020 --esModuleInterop --skipLibCheck",
+    "coletor:testar": "npm run coletor:build --silent && node scripts/testar-coletor.cjs",
+    "motor:testar": "npm run coletor:build --silent && node scripts/testar-motor.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",

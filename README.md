@@ -40,6 +40,47 @@ integração de pagamento.
 
 ---
 
+## O motor: de onde vêm os leads
+
+| Fonte | Situação | Por quê |
+|-------|----------|---------|
+| **Export de WhatsApp** | ✅ implementado | Não existe API de leitura de grupo — e não deveria. O dado é o que **você já tem** por ser membro: `⋮ > Mais > Exportar conversa > Sem mídia`. Um export traz centenas de mensagens de uma vez. |
+| **OLX** | ⛔ bloqueado | O site está atrás de proteção anti-bot da Cloudflare: até o `robots.txt` responde `403` com challenge. Contornar isso é circundar controle de acesso. Caminho legítimo é integração oficial com o Grupo OLX (acordo comercial). |
+| **Facebook** | ⛔ bloqueado | Exige login, grupos fechados, raspagem explicitamente proibida no ToS. |
+| Copiar e colar | ✅ `/ingerir` | Continua existindo para anúncio avulso. |
+
+A arquitetura é de adaptadores (`src/lib/coletores/`) — se você fechar um feed
+oficial de portal, entra como mais um coletor sem mexer no resto.
+
+### Testar o motor sem infraestrutura nenhuma
+
+O caminho mais curto para saber se funciona com o **seu** estoque, sem Vercel e
+sem Supabase:
+
+```bash
+npm install
+ANTHROPIC_API_KEY=sk-ant-... npm run motor:testar -- /caminho/do/export.txt
+```
+
+Ele coleta, extrai com a IA e imprime os leads estruturados, o pitch individual
+e a mensagem de lista — direto no terminal. Use `--limite 5` para gastar pouco
+token na primeira rodada.
+
+Para calibrar só o pré-filtro, sem gastar token nenhum:
+
+```bash
+npm run coletor:testar -- /caminho/do/export.txt
+```
+
+Mostra quantas mensagens viraram candidatas e o motivo de cada descarte. Num
+grupo real espere ~80-90% de descarte — é conversa fiada, figurinha e bom dia,
+e é exatamente esse filtro que evita queimar token de IA à toa.
+
+**LGPD:** os anúncios carregam nome e telefone de pessoa física. Antes de
+cobrar por isso, defina base legal, canal de opt-out e prazo de retenção.
+
+---
+
 ## Setup
 
 ### 1. Banco
@@ -50,7 +91,8 @@ No SQL Editor do Supabase, **em ordem**:
    `match_empreendimento`, `sinais_judiciais`.
 2. `supabase/migrations/0002_auth_saas.sql` — `perfis`, trigger de cadastro,
    helpers de política e **RLS em todas as tabelas**.
-3. `scripts/seed.sql` (opcional) — 20 empreendimentos **placeholder fictícios**,
+3. `supabase/migrations/0003_anunciado_em.sql` — data real do anúncio.
+4. `scripts/seed.sql` (opcional) — 20 empreendimentos **placeholder fictícios**,
    marcados como tal. Substitua pelos reais dos sites das construtoras; é essa
    base que faz o fuzzy match e a data de entrega no pitch funcionarem.
 
@@ -89,7 +131,8 @@ Opcionais (P1 — DataJud): `DATAJUD_API_KEY`, `CRON_SECRET`, `DATAJUD_MUNICIPIO
 npm install
 npm run dev
 npm run build
-./scripts/testar-rls.sh   # exercita o RLS num Postgres local
+./scripts/testar-rls.sh    # exercita o RLS num Postgres local
+npm run coletor:testar     # roda o coletor na fixture fictícia
 ```
 
 ---
@@ -101,7 +144,8 @@ npm run build
 | `/cadastrar`, `/entrar` | qualquer um | cadastro self-service e login |
 | `/aguardando` | conta pendente/suspensa | explica que o acesso está em análise |
 | `/` | corretor ativo e admin | pool de oportunidades, filtros, drawer com o anúncio original e o telefone do vendedor |
-| `/ingerir` | admin | caixa de ingestão |
+| `/coletar` | admin | solta o export de WhatsApp, revisa os candidatos e ingere |
+| `/ingerir` | admin | caixa de ingestão avulsa (copiar e colar) |
 | `/lista` | admin | gerador da mensagem para corretor |
 | `/empreendimentos` | admin | CRUD da base de fuzzy match |
 | `/admin/corretores` | admin | aprovar, suspender e promover contas |
@@ -170,6 +214,8 @@ e verifica 18 asserções, entre elas:
   confirmação no Supabase, o fluxo já trata (avisa para confirmar antes de
   entrar), mas não há reenvio de e-mail nem recuperação de senha.
 - **Sem rate limit** no cadastro: qualquer um cria conta. O portão é a aprovação.
+- **Coleta ainda é manual no gatilho**: você exporta o grupo e solta o arquivo.
+  Não há coleta agendada — WhatsApp não permite, e é o formato honesto aqui.
 - `npm audit` acusa 2 vulnerabilidades altas em `postcss` **transitivo do próprio
   Next 14** (build-time, não runtime). Só some migrando para Next 16, que é
   breaking change.
@@ -196,13 +242,16 @@ src/
     page.tsx                    pool de leads (visão muda por papel)
     entrar/ cadastrar/          auth self-service
     aguardando/                 conta pendente ou suspensa
-    ingerir/ lista/             admin: ingestão e geração de lista
+    coletar/                    admin: export de WhatsApp -> candidatos
+    ingerir/ lista/             admin: ingestão avulsa e geração de lista
     empreendimentos/            admin: CRUD do fuzzy match
     admin/corretores/           admin: aprovar e promover contas
     api/cron/datajud/           coleta DataJud TJGO (P1)
     actions/                    server actions (todas com gate de papel)
   components/                   tabela, filtros, drawer, botão copiar
   lib/
+    coletores/                  motor: parser de export, pré-filtro de repasse
+    extracao.ts                 prompt + parse (compartilhado app/CLI)
     sessao.ts                   exigirAcesso() / exigirAdmin()
     supabase-usuario.ts         client com sessão (RLS vale)
     supabase.ts                 client service_role (ignora RLS)
@@ -214,4 +263,7 @@ supabase/
 scripts/
   seed.sql                      empreendimentos placeholder
   testar-rls.sh                 roda os testes de RLS
+  testar-coletor.cjs            só a coleta (sem IA, sem custo)
+  testar-motor.cjs              motor completo no terminal (coleta + IA + pitch)
+  exemplo-grupo-whatsapp.txt    fixture fictícia para teste
 ```

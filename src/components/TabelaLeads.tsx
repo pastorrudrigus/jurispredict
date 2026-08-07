@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { brl, corScore, deltaTexto, tempoRelativo } from "@/lib/format";
+import { brl, corScore, deltaTexto, idadeLead } from "@/lib/format";
 import type { Lead } from "@/lib/types";
 import DrawerLead from "./DrawerLead";
 
@@ -154,7 +154,7 @@ export default function TabelaLeads({
                   </td>
                   <td className="px-3 py-2 text-xs text-zinc-500">{lead.fonte}</td>
                   <td className="px-3 py-2 text-xs text-zinc-500">
-                    {tempoRelativo(lead.criado_em)}
+                    {idadeLead(lead)}
                   </td>
                   <td
                     className={`px-3 py-2 text-xs ${CORES_STATUS[lead.status] ?? "text-zinc-400"}`}

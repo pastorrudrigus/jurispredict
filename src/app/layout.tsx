@@ -17,6 +17,7 @@ const NAV_CORRETOR = [{ href: "/", label: "Oportunidades" }];
 
 const NAV_ADMIN = [
   { href: "/", label: "Painel" },
+  { href: "/coletar", label: "Coletar" },
   { href: "/ingerir", label: "Ingerir" },
   { href: "/lista", label: "Gerar lista" },
   { href: "/empreendimentos", label: "Empreendimentos" },

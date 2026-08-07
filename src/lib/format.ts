@@ -48,6 +48,17 @@ export function dataBR(iso: string | null | undefined): string | null {
   return `${dia}/${mes}/${ano}`;
 }
 
+/**
+ * Idade do lead pela data real do anúncio quando ela existe. Sem isso, um
+ * export antigo de WhatsApp apareceria como recém-captado.
+ */
+export function idadeLead(lead: {
+  anunciado_em?: string | null;
+  criado_em: string;
+}): string {
+  return tempoRelativo(lead.anunciado_em ?? lead.criado_em);
+}
+
 export function corScore(score: number | null | undefined): string {
   const s = score ?? 0;
   if (s >= 61) return "bg-emerald-500/15 text-emerald-300 border-emerald-500/40";

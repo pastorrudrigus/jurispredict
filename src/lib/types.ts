@@ -64,6 +64,8 @@ export type Lead = {
   extraido_em: string | null;
   modelo_extracao: string | null;
   criado_em: string;
+  /** Data real de publicação na origem. NULL = desconhecida (usar criado_em). */
+  anunciado_em: string | null;
   empreendimentos?: Pick<
     Empreendimento,
     "id" | "nome" | "construtora" | "bairro" | "data_entrega_prevista"

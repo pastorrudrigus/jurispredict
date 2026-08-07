@@ -55,7 +55,7 @@ export default function FormularioIngestao() {
         const parciais = await ingerirLote({
           fonte,
           urlOriginal: url,
-          textos: lote,
+          itens: lote.map((texto) => ({ texto })),
           offsetIndice: offset,
         });
         offset += lote.length;

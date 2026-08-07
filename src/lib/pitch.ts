@@ -1,4 +1,4 @@
-import { brl, dataBR, deltaTexto, tempoRelativo } from "./format";
+import { brl, dataBR, deltaTexto, idadeLead } from "./format";
 import type { Lead } from "./types";
 
 function nomeEmpreendimento(lead: Lead): string {
@@ -51,7 +51,7 @@ export function pitchIndividual(lead: Lead): string {
   const entrega = dataBR(lead.empreendimentos?.data_entrega_prevista ?? null);
   if (entrega) linhas.push(`🗓 Entrega prevista: ${entrega}`);
 
-  linhas.push(`Fonte: ${lead.fonte}, captado ${tempoRelativo(lead.criado_em)}`);
+  linhas.push(`Fonte: ${lead.fonte}, captado ${idadeLead(lead)}`);
 
   return linhas.join("\n");
 }
@@ -78,7 +78,7 @@ function itemCompacto(lead: Lead, indice: number): string {
   const rodape: string[] = [];
   const entrega = dataBR(lead.empreendimentos?.data_entrega_prevista ?? null);
   if (entrega) rodape.push(`Entrega ${entrega}`);
-  rodape.push(`${lead.fonte}, ${tempoRelativo(lead.criado_em)}`);
+  rodape.push(`${lead.fonte}, ${idadeLead(lead)}`);
   linhas.push(`   ${rodape.join(" · ")}`);
 
   return linhas.join("\n");
