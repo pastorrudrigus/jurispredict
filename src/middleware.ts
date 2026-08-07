@@ -15,6 +15,13 @@ function ehPublica(pathname: string): boolean {
  * verdade. O middleware é só o primeiro portão.
  */
 export async function middleware(request: NextRequest) {
+  const { pathname: earlyPath } = request.nextUrl;
+  // /api/setup e /api/cron se autenticam sozinhas (token e CRON_SECRET),
+  // nao passam por Supabase auth.
+  if (earlyPath.startsWith("/api/setup") || earlyPath.startsWith("/api/cron")) {
+    return NextResponse.next();
+  }
+
   let resposta = NextResponse.next({ request });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
