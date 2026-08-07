@@ -72,5 +72,5 @@ export async function middleware(request: NextRequest) {
 export const config = {
   // /api/cron/* fica fora: o cron da Vercel não manda cookie de sessão, ele se
   // autentica com CRON_SECRET dentro da própria rota.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/cron).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/cron|api/setup).*)"],
 };
