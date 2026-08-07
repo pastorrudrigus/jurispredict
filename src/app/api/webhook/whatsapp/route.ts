@@ -138,7 +138,12 @@ export async function POST(req: Request) {
     }
   }
 
-  const scoreFinal = aplicarBonusJanela(extraido.score_urgencia ?? 0, naJanela);
+  const classe = classeLead(extraido);
+  const scoreFinal = aplicarBonusJanela(
+    extraido.score_urgencia ?? 0,
+    classe,
+    naJanela,
+  );
 
   // Anunciado_em: timestamp da mensagem (Unix segs → ISO)
   const anunciadoEm = payload.data?.messageTimestamp
@@ -177,11 +182,6 @@ export async function POST(req: Request) {
       { status: 500 },
     );
   }
-
-  const classe = classeLead({
-    anunciante_tipo: extraido.anunciante_tipo ?? "indefinido",
-    score_urgencia: scoreFinal,
-  });
 
   return NextResponse.json({
     ok: true,
