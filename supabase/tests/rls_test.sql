@@ -143,4 +143,65 @@ begin;
 commit;
 
 \echo ''
-\echo '===== TODOS OS TESTES DE RLS PASSARAM ====='
+
+
+-- ═══════════ 0004: classificador de anunciante + núcleo judicial ═══════════
+insert into anuncios_repasse (fonte, hash_dedup, texto_bruto, status, score_urgencia,
+                              telefone_contato, anunciante_tipo, anunciante_confianca) values
+  ('whatsapp','h10','dono com pressa','novo',        70,'62900000010','proprietario',90),
+  ('whatsapp','h11','corretor com carteira','benchmark',10,'62900000011','corretor',95),
+  -- mesmo telefone em 3 anúncios: profissional disfarçado de dono
+  ('whatsapp','h12','anuncio a','novo',50,'62900000099','proprietario',80),
+  ('whatsapp','h13','anuncio b','novo',50,'62900000099','proprietario',80),
+  ('whatsapp','h14','anuncio c','novo',50,'62900000099','proprietario',80);
+
+begin;
+  select como('ativo@x');
+  set local role authenticated;
+  select checa('corretor NAO ve anuncio marcado benchmark',
+               (select count(*) from anuncios_repasse where status = 'benchmark'), 0);
+  select checa('corretor NAO ve leads_judiciais',
+               (select count(*) from leads_judiciais), 0);
+  select checa('corretor le a watchlist de construtoras',
+               (select count(*) from construtoras_watchlist), 7);
+commit;
+
+select checa('telefone repetido 3x reclassifica como corretor',
+             reclassificar_anunciantes_por_telefone(3)::bigint, 3);
+select checa('reclassificacao gravou o tipo',
+             (select count(*) from anuncios_repasse
+               where telefone_contato = '62900000099' and anunciante_tipo = 'corretor'), 3);
+select checa('reclassificacao NAO toca em quem tem telefone unico',
+             (select count(*) from anuncios_repasse
+               where telefone_contato = '62900000010' and anunciante_tipo = 'proprietario'), 1);
+select checa('rodar de novo nao mexe em nada (idempotente)',
+             reclassificar_anunciantes_por_telefone(3)::bigint, 0);
+
+-- janela crítica pré-chaves: -6 a +8 meses da entrega
+select checa('entrega em 3 meses esta na janela',
+             (select count(*) where na_janela_critica((current_date + interval '3 months')::date)), 1);
+select checa('entrega ha 3 meses ainda esta na janela',
+             (select count(*) where na_janela_critica((current_date - interval '3 months')::date)), 1);
+select checa('entrega em 20 meses esta FORA da janela',
+             (select count(*) where na_janela_critica((current_date + interval '20 months')::date)), 0);
+select checa('entrega ha 2 anos esta FORA da janela',
+             (select count(*) where na_janela_critica((current_date - interval '24 months')::date)), 0);
+select checa('empreendimento sem data de entrega nao entra na janela',
+             (select count(*) where na_janela_critica(null)), 0);
+
+-- cruzamento âncora anúncio × processo
+insert into sinais_judiciais (numero_processo, categoria, comarca)
+  values ('5000001-11.2026.8.09.0051','execucao','Goiânia');
+insert into leads_judiciais (sinal_id, tipo_oportunidade, pessoa_alvo, score_oportunidade)
+  select id, 'vendedor_pressionado', 'Maria Exemplo da Silva', 80 from sinais_judiciais limit 1;
+update anuncios_repasse set nome_contato = 'MARIA EXEMPLO DA SILVA'
+ where hash_dedup = 'h10';
+
+select checa('cruzamento acha anunciante que tambem e parte no processo',
+             (select count(*) from cruzar_anuncios_com_judiciais()), 1);
+select checa('cruzamento leva o anuncio para urgencia 100',
+             aplicar_cruzamento_judicial()::bigint, 1);
+select checa('score 100 gravado no anuncio cruzado',
+             (select score_urgencia from anuncios_repasse where hash_dedup = 'h10')::bigint, 100);
+\echo ''
+\echo '===== TODOS OS TESTES PASSARAM ====='

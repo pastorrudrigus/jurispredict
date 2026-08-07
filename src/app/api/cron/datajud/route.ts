@@ -1,33 +1,27 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/supabase";
+import { CONSULTAS } from "@/lib/datajud/consultas";
+import { ErroDataJud, paraSinal, varrerCategoria } from "@/lib/datajud/cliente";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
-
-const ENDPOINT = "https://api-publica.datajud.cnj.br/api_publica_tjgo/_search";
-const DESDE = "2023-01-01";
-// Código IBGE do município de Goiânia. Configurável porque o campo
-// orgaoJulgador.codigoMunicipioIBGE nem sempre vem preenchido — se a coleta
-// voltar vazia, tente rodar sem o filtro (DATAJUD_MUNICIPIO_IBGE=).
-const MUNICIPIO_IBGE = process.env.DATAJUD_MUNICIPIO_IBGE ?? "5208707";
-
-const TERMOS = ["rescisão", "rescisao", "execução", "execucao", "inventário", "inventario", "divórcio", "divorcio"];
-
-type Hit = {
-  _source?: {
-    numeroProcesso?: string;
-    classe?: { nome?: string };
-    assuntos?: Array<{ nome?: string }>;
-    dataAjuizamento?: string;
-    orgaoJulgador?: { nome?: string; codigoMunicipioIBGE?: number | string };
-  };
-};
+export const maxDuration = 300;
 
 function autorizado(request: NextRequest): boolean {
   const segredo = process.env.CRON_SECRET;
   if (!segredo) return process.env.NODE_ENV !== "production";
-  const header = request.headers.get("authorization") ?? "";
-  return header === `Bearer ${segredo}`;
+  return (request.headers.get("authorization") ?? "") === `Bearer ${segredo}`;
+}
+
+/** Última atualização já vista — base do delta diário. */
+async function marcoDelta(): Promise<string | null> {
+  const { data } = await db()
+    .from("sinais_judiciais")
+    .select("ultima_atualizacao")
+    .not("ultima_atualizacao", "is", null)
+    .order("ultima_atualizacao", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as { ultima_atualizacao: string } | null)?.ultima_atualizacao ?? null;
 }
 
 export async function GET(request: NextRequest) {
@@ -43,65 +37,58 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const filtros: unknown[] = [
-    { range: { dataAjuizamento: { gte: DESDE } } },
-    {
-      multi_match: {
-        query: TERMOS.join(" "),
-        fields: ["classe.nome", "assuntos.nome"],
-        operator: "or",
-      },
-    },
-  ];
-  if (MUNICIPIO_IBGE) {
-    filtros.push({ term: { "orgaoJulgador.codigoMunicipioIBGE": Number(MUNICIPIO_IBGE) } });
+  // `?completo=1` ignora o delta e repuxa desde 2023 — para a carga inicial.
+  const completo = request.nextUrl.searchParams.get("completo") === "1";
+  const desdeAtualizacao = completo ? null : await marcoDelta();
+
+  const porCategoria: Record<string, { coletados: number; gravados: number; erro?: string }> = {};
+  let totalGravados = 0;
+
+  for (const def of CONSULTAS) {
+    try {
+      const processos = await varrerCategoria(def, {
+        apiKey,
+        desdeAtualizacao,
+        maxPaginas: completo ? 50 : 10,
+      });
+
+      if (processos.length === 0) {
+        porCategoria[def.categoria] = { coletados: 0, gravados: 0 };
+        continue;
+      }
+
+      const linhas = processos.map((p) => paraSinal(p, def.categoria));
+
+      /*
+       * upsert por numero_processo: um processo pode cair em mais de uma
+       * categoria (execução que também tem movimentação de leilão). A última
+       * categoria vence — o Estágio 3 relê o payload de qualquer forma.
+       */
+      const { error, count } = await db()
+        .from("sinais_judiciais")
+        .upsert(linhas, { onConflict: "numero_processo", count: "exact" });
+
+      if (error) throw new Error(error.message);
+
+      porCategoria[def.categoria] = {
+        coletados: processos.length,
+        gravados: count ?? linhas.length,
+      };
+      totalGravados += count ?? linhas.length;
+    } catch (e) {
+      // Uma categoria quebrada não derruba a varredura inteira.
+      porCategoria[def.categoria] = {
+        coletados: 0,
+        gravados: 0,
+        erro: e instanceof ErroDataJud ? e.message : String(e),
+      };
+    }
   }
 
-  const resposta = await fetch(ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `APIKey ${apiKey}`,
-    },
-    body: JSON.stringify({ size: 200, query: { bool: { must: filtros } } }),
-    cache: "no-store",
+  return NextResponse.json({
+    modo: completo ? "carga_inicial" : "delta",
+    desde_atualizacao: desdeAtualizacao,
+    total_gravados: totalGravados,
+    por_categoria: porCategoria,
   });
-
-  if (!resposta.ok) {
-    const corpo = await resposta.text();
-    return NextResponse.json(
-      { erro: `DataJud respondeu ${resposta.status}`, corpo: corpo.slice(0, 500) },
-      { status: 502 },
-    );
-  }
-
-  const json = (await resposta.json()) as { hits?: { hits?: Hit[] } };
-  const hits = json.hits?.hits ?? [];
-
-  const linhas = hits
-    .map((h) => h._source)
-    .filter((s): s is NonNullable<Hit["_source"]> => Boolean(s?.numeroProcesso))
-    .map((s) => ({
-      fonte: "datajud_tjgo",
-      numero_processo: s.numeroProcesso!,
-      classe: s.classe?.nome ?? null,
-      assunto: s.assuntos?.map((a) => a.nome).filter(Boolean).join("; ") || null,
-      data_ajuizamento: s.dataAjuizamento ? s.dataAjuizamento.slice(0, 10) : null,
-      municipio: s.orgaoJulgador?.nome ?? null,
-      payload: s,
-    }));
-
-  if (linhas.length === 0) {
-    return NextResponse.json({ coletados: 0, gravados: 0 });
-  }
-
-  const { error, count } = await db()
-    .from("sinais_judiciais")
-    .upsert(linhas, { onConflict: "numero_processo", count: "exact" });
-
-  if (error) {
-    return NextResponse.json({ erro: error.message }, { status: 500 });
-  }
-
-  return NextResponse.json({ coletados: hits.length, gravados: count ?? linhas.length });
 }

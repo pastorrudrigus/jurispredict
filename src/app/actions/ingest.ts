@@ -6,6 +6,7 @@ import { db } from "@/lib/supabase";
 import { exigirAdmin } from "@/lib/sessao";
 import { MODELO_EXTRACAO, extrairAnuncio } from "@/lib/anthropic";
 import { FONTES, type Fonte, type Lead, type ResultadoItem } from "@/lib/types";
+import { aplicarBonusJanela, classeLead } from "@/lib/classe";
 
 const SIM_MINIMA = 0.35;
 
@@ -14,15 +15,27 @@ function hashDedup(fonte: string, texto: string): string {
   return createHash("md5").update(`${fonte}${normalizado}`).digest("hex");
 }
 
-async function matchEmpreendimento(
-  busca: string | null,
-): Promise<{ id: string; nome: string; sim: number } | null> {
+type Match = { id: string; nome: string; sim: number; naJanela: boolean };
+
+async function matchEmpreendimento(busca: string | null): Promise<Match | null> {
   if (!busca || busca.trim().length < 3) return null;
   const { data, error } = await db().rpc("match_empreendimento", { busca });
   if (error || !Array.isArray(data) || data.length === 0) return null;
   const linha = data[0] as { id: string; nome: string; sim: number };
   if (typeof linha.sim !== "number" || linha.sim < SIM_MINIMA) return null;
-  return linha;
+
+  // A janela crítica pré-chaves decide o bônus de score, então precisa vir
+  // junto do match — não adianta saber o empreendimento sem saber a entrega.
+  const { data: emp } = await db()
+    .from("empreendimentos_janela")
+    .select("na_janela_critica")
+    .eq("id", linha.id)
+    .maybeSingle();
+
+  return {
+    ...linha,
+    naJanela: (emp as { na_janela_critica: boolean } | null)?.na_janela_critica === true,
+  };
 }
 
 export type ItemLote = {
@@ -83,7 +96,23 @@ export async function ingerirLote(input: LoteInput): Promise<ResultadoItem[]> {
       // 3. fuzzy match do empreendimento
       const match = await matchEmpreendimento(extraido.empreendimento_texto);
 
-      // 4. insert (inclusive dos não-repasse, para auditoria)
+      // 4. classe do lead e bônus da janela crítica
+      const classe = classeLead(extraido);
+      const score = aplicarBonusJanela(
+        extraido.score_urgencia,
+        classe,
+        match?.naJanela ?? false,
+      );
+
+      // Anúncio de corretor/imobiliária não é lixo: vira benchmark de preço.
+      // O RLS já esconde `benchmark` do corretor — é inteligência do operador.
+      const status = !extraido.eh_repasse
+        ? "invalido"
+        : classe === "benchmark"
+          ? "benchmark"
+          : "novo";
+
+      // 5. insert (inclusive dos não-repasse, para auditoria)
       const { data: inserido, error } = await db()
         .from("anuncios_repasse")
         .insert({
@@ -102,12 +131,15 @@ export async function ingerirLote(input: LoteInput): Promise<ResultadoItem[]> {
           fase_obra_mencionada: extraido.fase_obra_mencionada,
           telefone_contato: extraido.telefone_contato,
           nome_contato: extraido.nome_contato,
-          score_urgencia: extraido.score_urgencia,
+          score_urgencia: score,
           sinais_urgencia: extraido.sinais_urgencia,
-          status: extraido.eh_repasse ? "novo" : "invalido",
+          status,
           extraido_em: new Date().toISOString(),
           modelo_extracao: MODELO_EXTRACAO,
           anunciado_em: anunciadoEm,
+          anunciante_tipo: extraido.anunciante_tipo,
+          anunciante_confianca: extraido.anunciante_confianca,
+          sinais_anunciante: extraido.sinais_anunciante,
         })
         .select(
           "*, empreendimentos(id, nome, construtora, bairro, data_entrega_prevista)",
@@ -131,6 +163,20 @@ export async function ingerirLote(input: LoteInput): Promise<ResultadoItem[]> {
         mensagem: e instanceof Error ? e.message : String(e),
       });
     }
+  }
+
+  /*
+   * Sinal que só existe olhando o conjunto: telefone repetido em 3+ anúncios
+   * é profissional, por mais que cada anúncio isolado se apresente como dono.
+   * Roda uma vez por lote, não por item.
+   */
+  const { error: erroReclass } = await db().rpc(
+    "reclassificar_anunciantes_por_telefone",
+    { min_ocorrencias: 3 },
+  );
+  if (erroReclass) {
+    // Não derruba o lote: os anúncios já entraram, só a reclassificação falhou.
+    console.error("reclassificação por telefone falhou:", erroReclass.message);
   }
 
   revalidatePath("/");

@@ -15,6 +15,7 @@ type Params = {
   status?: string;
   urgencia?: string;
   busca?: string;
+  anunciante?: string;
 };
 
 function Contador({
@@ -52,6 +53,7 @@ export default async function PainelPage({
       status: searchParams.status,
       urgenciaMinima: Number.isFinite(urgencia) ? urgencia : undefined,
       busca: searchParams.busca,
+      anunciante: searchParams.anunciante,
       incluirInvalidos: admin && searchParams.status === "invalido",
     }),
     contadores(),

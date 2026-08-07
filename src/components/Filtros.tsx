@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
-import { STATUS } from "@/lib/types";
+import { ANUNCIANTE_TIPOS, STATUS } from "@/lib/types";
 
 const URGENCIAS = [
   { valor: "", rotulo: "Qualquer urgência" },
@@ -34,7 +34,7 @@ export default function Filtros({
     iniciar(() => router.replace(`${pathname}?${novos.toString()}`));
   }
 
-  const temFiltro = ["bairro", "status", "urgencia", "busca"].some((k) =>
+  const temFiltro = ["bairro", "status", "urgencia", "busca", "anunciante"].some((k) =>
     params.get(k),
   );
 
@@ -112,6 +112,25 @@ export default function Filtros({
           {URGENCIAS.map((u) => (
             <option key={u.valor} value={u.valor}>
               {u.rotulo}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="w-[180px]">
+        <label className="label" htmlFor="f-anunciante">
+          Anunciante
+        </label>
+        <select
+          id="f-anunciante"
+          className="input"
+          value={params.get("anunciante") ?? ""}
+          onChange={(e) => aplicar("anunciante", e.target.value)}
+        >
+          <option value="">Todos</option>
+          {ANUNCIANTE_TIPOS.map((t) => (
+            <option key={t} value={t}>
+              {t}
             </option>
           ))}
         </select>

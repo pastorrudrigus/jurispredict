@@ -11,6 +11,7 @@ type Params = {
   status?: string;
   urgencia?: string;
   busca?: string;
+  anunciante?: string;
 };
 
 export default async function ListaPage({ searchParams }: { searchParams: Params }) {
@@ -31,6 +32,7 @@ export default async function ListaPage({ searchParams }: { searchParams: Params
           status: searchParams.status,
           urgenciaMinima: Number.isFinite(urgencia) ? urgencia : undefined,
           busca: searchParams.busca,
+          anunciante: searchParams.anunciante,
           limite: 100,
         }),
     bairrosDisponiveis(),

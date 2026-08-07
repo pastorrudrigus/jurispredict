@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { brl, corScore, deltaTexto, idadeLead } from "@/lib/format";
 import type { Lead } from "@/lib/types";
+import { COR_CLASSE, ROTULO_CLASSE, classeLead } from "@/lib/classe";
 import DrawerLead from "./DrawerLead";
 
 const CORES_STATUS: Record<string, string> = {
@@ -75,6 +76,7 @@ export default function TabelaLeads({
                   />
                 </th>
               ) : null}
+              <th className="px-3 py-2 text-center">Classe</th>
               <th className="px-3 py-2">Empreendimento</th>
               <th className="px-3 py-2">Bairro</th>
               <th className="px-3 py-2">Tipologia</th>
@@ -107,6 +109,18 @@ export default function TabelaLeads({
                       />
                     </td>
                   ) : null}
+                  <td className="px-3 py-2 text-center">
+                    <span
+                      className={`rounded border px-1.5 py-0.5 text-xs font-bold ${COR_CLASSE[classeLead(lead)]}`}
+                      title={
+                        lead.anunciante_tipo
+                          ? `${lead.anunciante_tipo} (confiança ${lead.anunciante_confianca ?? 0})`
+                          : "anunciante não classificado"
+                      }
+                    >
+                      {ROTULO_CLASSE[classeLead(lead)]}
+                    </span>
+                  </td>
                   <td className="max-w-[280px] px-3 py-2">
                     <span className="block truncate text-zinc-100">
                       {lead.empreendimentos?.nome ??

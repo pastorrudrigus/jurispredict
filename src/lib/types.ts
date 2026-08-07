@@ -8,8 +8,19 @@ export const STATUS = [
   "vendido",
   "expirado",
   "invalido",
+  // anúncio de corretor/imobiliária: não é lead, é régua de preço.
+  // O RLS esconde do corretor — inteligência do operador.
+  "benchmark",
 ] as const;
 export type Status = (typeof STATUS)[number];
+
+export const ANUNCIANTE_TIPOS = [
+  "proprietario",
+  "corretor",
+  "imobiliaria",
+  "indefinido",
+] as const;
+export type AnuncianteTipo = (typeof ANUNCIANTE_TIPOS)[number];
 
 export const PAPEIS = ["admin", "corretor"] as const;
 export type Papel = (typeof PAPEIS)[number];
@@ -66,6 +77,9 @@ export type Lead = {
   criado_em: string;
   /** Data real de publicação na origem. NULL = desconhecida (usar criado_em). */
   anunciado_em: string | null;
+  anunciante_tipo: AnuncianteTipo | null;
+  anunciante_confianca: number | null;
+  sinais_anunciante: string[] | null;
   empreendimentos?: Pick<
     Empreendimento,
     "id" | "nome" | "construtora" | "bairro" | "data_entrega_prevista"
@@ -88,6 +102,9 @@ export type Extracao = {
   sinais_urgencia: string[];
   score_urgencia: number;
   eh_repasse: boolean;
+  anunciante_tipo: AnuncianteTipo;
+  anunciante_confianca: number;
+  sinais_anunciante: string[];
 };
 
 export type ResultadoItem = {

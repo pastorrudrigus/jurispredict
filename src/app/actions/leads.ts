@@ -13,6 +13,7 @@ export type FiltroLeads = {
   status?: string;
   urgenciaMinima?: number;
   busca?: string;
+  anunciante?: string;
   incluirInvalidos?: boolean;
   limite?: number;
 };
@@ -38,6 +39,7 @@ export async function listarLeads(filtro: FiltroLeads = {}): Promise<Lead[]> {
   }
 
   if (filtro.bairro) q = q.ilike("bairro", `%${filtro.bairro}%`);
+  if (filtro.anunciante) q = q.eq("anunciante_tipo", filtro.anunciante);
   if (filtro.urgenciaMinima) q = q.gte("score_urgencia", filtro.urgenciaMinima);
   if (filtro.busca) {
     const t = filtro.busca.replace(/[%,]/g, " ");

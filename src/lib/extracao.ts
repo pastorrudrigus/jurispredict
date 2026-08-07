@@ -26,7 +26,10 @@ válido, sem markdown:
   "nome_contato": string|null,
   "sinais_urgencia": string[],
   "score_urgencia": 0-100,
-  "eh_repasse": boolean
+  "eh_repasse": boolean,
+  "anunciante_tipo": "proprietario|corretor|imobiliaria|indefinido",
+  "anunciante_confianca": 0-100,
+  "sinais_anunciante": string[]
 }
 
 Regras:
@@ -36,7 +39,19 @@ Regras:
   negociável); 61-100 sinais fortes (urgente, viagem, abaixo do valor pago,
   entrega chegando).
 - "80 mil" -> 80000. Telefone: só dígitos com DDD.
-- Nunca invente dados ausentes: use null.`;
+- Nunca invente dados ausentes: use null.
+
+Classificação do anunciante:
+- corretor/imobiliaria: menção a CRECI, "trabalhamos com", "temos outras
+  opções", "agende visita com nosso consultor", link de portal ou site
+  imobiliário, linguagem de portfólio, plantão de vendas.
+- proprietario: primeira pessoa ("meu apartamento", "comprei na planta"),
+  motivo pessoal (mudança, viagem, aperto financeiro), imperfeições de
+  texto, "direto com proprietário", "sem imobiliária".
+- indefinido quando não houver sinal suficiente. Não chute: prefira
+  indefinido com confiança baixa a um palpite com confiança alta.
+- sinais_anunciante: liste os trechos ou fatos concretos que levaram à
+  classificação, não a conclusão.`;
 
 /** Remove cercas de markdown e sobras de texto ao redor do JSON. */
 export function parseJsonDefensivo(raw: string): unknown {
@@ -53,6 +68,13 @@ export function parseJsonDefensivo(raw: string): unknown {
     return JSON.parse(t.slice(inicio, fim + 1));
   }
 }
+
+const TIPOS_ANUNCIANTE = [
+  "proprietario",
+  "corretor",
+  "imobiliaria",
+  "indefinido",
+] as const;
 
 function texto(v: unknown): string | null {
   if (typeof v !== "string") return null;
@@ -91,6 +113,18 @@ export function normalizarExtracao(bruto: unknown): Extracao {
       : [],
     score_urgencia: Math.max(0, Math.min(100, Math.round(score))),
     eh_repasse: o.eh_repasse === true,
+    anunciante_tipo: TIPOS_ANUNCIANTE.includes(o.anunciante_tipo as never)
+      ? (o.anunciante_tipo as Extracao["anunciante_tipo"])
+      : "indefinido",
+    anunciante_confianca: Math.max(
+      0,
+      Math.min(100, Math.round(numero(o.anunciante_confianca) ?? 0)),
+    ),
+    sinais_anunciante: Array.isArray(o.sinais_anunciante)
+      ? o.sinais_anunciante.filter(
+          (s): s is string => typeof s === "string" && s.trim() !== "",
+        )
+      : [],
   };
 }
 

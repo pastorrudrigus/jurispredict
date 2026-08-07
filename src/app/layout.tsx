@@ -19,6 +19,7 @@ const NAV_ADMIN = [
   { href: "/", label: "Painel" },
   { href: "/coletar", label: "Coletar" },
   { href: "/ingerir", label: "Ingerir" },
+  { href: "/radar-judicial", label: "Radar Judicial" },
   { href: "/lista", label: "Gerar lista" },
   { href: "/empreendimentos", label: "Empreendimentos" },
   { href: "/admin/corretores", label: "Corretores" },
