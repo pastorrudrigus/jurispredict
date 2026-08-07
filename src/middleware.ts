@@ -1,39 +1,75 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { SESSION_COOKIE, safeEqual, sessionToken } from "@/lib/auth";
+import { createServerClient } from "@supabase/ssr";
 
-const PUBLIC_PATHS = ["/login"];
+/** Rotas que qualquer visitante alcança sem sessão. */
+const PUBLICAS = ["/entrar", "/cadastrar", "/auth"];
 
+function ehPublica(pathname: string): boolean {
+  return PUBLICAS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+/**
+ * Renova a sessão do Supabase a cada request e barra quem não está logado.
+ * Papel (admin vs corretor) NÃO é checado aqui — isso é feito por
+ * `exigirAdmin()` nas páginas e nas server actions, onde a decisão vale de
+ * verdade. O middleware é só o primeiro portão.
+ */
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  let resposta = NextResponse.next({ request });
 
-  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
-    return NextResponse.next();
-  }
-
-  const password = process.env.ADMIN_PASSWORD;
-  if (!password) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anon) {
     return new NextResponse(
-      "ADMIN_PASSWORD não configurada. Defina a variável de ambiente antes de usar o painel.",
+      "NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY não configuradas.",
       { status: 500 },
     );
   }
 
-  const cookie = request.cookies.get(SESSION_COOKIE)?.value ?? "";
-  const expected = await sessionToken(password);
+  const supabase = createServerClient(url, anon, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(paraGravar) {
+        for (const { name, value } of paraGravar) {
+          request.cookies.set(name, value);
+        }
+        resposta = NextResponse.next({ request });
+        for (const { name, value, options } of paraGravar) {
+          resposta.cookies.set(name, value, options);
+        }
+      },
+    },
+  });
 
-  if (cookie && safeEqual(cookie, expected)) {
-    return NextResponse.next();
+  // getUser() valida o JWT com o servidor de auth e renova o cookie.
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { pathname } = request.nextUrl;
+
+  if (!user && !ehPublica(pathname)) {
+    const destino = request.nextUrl.clone();
+    destino.pathname = "/entrar";
+    destino.search = pathname === "/" ? "" : `?next=${encodeURIComponent(pathname)}`;
+    return NextResponse.redirect(destino);
   }
 
-  const url = request.nextUrl.clone();
-  url.pathname = "/login";
-  url.search = pathname === "/" ? "" : `?next=${encodeURIComponent(pathname)}`;
-  return NextResponse.redirect(url);
+  // Já logado não precisa mais ver login/cadastro.
+  if (user && (pathname === "/entrar" || pathname === "/cadastrar")) {
+    const destino = request.nextUrl.clone();
+    destino.pathname = "/";
+    destino.search = "";
+    return NextResponse.redirect(destino);
+  }
+
+  return resposta;
 }
 
 export const config = {
-  // Protege tudo menos assets do Next e o favicon. /api/cron/* também passa
-  // pelo middleware — o cron da Vercel envia o cookie? Não. Por isso ele é
-  // liberado aqui e valida o próprio segredo internamente.
+  // /api/cron/* fica fora: o cron da Vercel não manda cookie de sessão, ele se
+  // autentica com CRON_SECRET dentro da própria rota.
   matcher: ["/((?!_next/static|_next/image|favicon.ico|api/cron).*)"],
 };

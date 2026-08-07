@@ -11,6 +11,23 @@ export const STATUS = [
 ] as const;
 export type Status = (typeof STATUS)[number];
 
+export const PAPEIS = ["admin", "corretor"] as const;
+export type Papel = (typeof PAPEIS)[number];
+
+export const STATUS_ACESSO = ["pendente", "ativo", "suspenso"] as const;
+export type StatusAcesso = (typeof STATUS_ACESSO)[number];
+
+export type Perfil = {
+  id: string;
+  email: string | null;
+  nome: string | null;
+  telefone: string | null;
+  creci: string | null;
+  papel: Papel;
+  status_acesso: StatusAcesso;
+  criado_em: string;
+};
+
 export type Empreendimento = {
   id: string;
   nome: string;

@@ -1,8 +1,11 @@
+import { exigirAdmin } from "@/lib/sessao";
 import FormularioIngestao from "./FormularioIngestao";
 
 export const dynamic = "force-dynamic";
 
-export default function IngerirPage() {
+export default async function IngerirPage() {
+  await exigirAdmin();
+
   return (
     <div className="space-y-4">
       <div>

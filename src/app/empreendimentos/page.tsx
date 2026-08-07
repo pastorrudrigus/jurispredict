@@ -1,9 +1,11 @@
 import { listarEmpreendimentos } from "@/app/actions/empreendimentos";
+import { exigirAdmin } from "@/lib/sessao";
 import GerenciadorEmpreendimentos from "./GerenciadorEmpreendimentos";
 
 export const dynamic = "force-dynamic";
 
 export default async function EmpreendimentosPage() {
+  await exigirAdmin();
   const empreendimentos = await listarEmpreendimentos();
 
   return (

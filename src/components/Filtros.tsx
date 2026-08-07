@@ -11,11 +11,21 @@ const URGENCIAS = [
   { valor: "81", rotulo: "≥ 81 (crítico)" },
 ];
 
-export default function Filtros({ bairros }: { bairros: string[] }) {
+/** Status que o corretor consegue ver — os demais são barrados pelo RLS. */
+const STATUS_CORRETOR = ["novo", "validado", "distribuido", "vendido"] as const;
+
+export default function Filtros({
+  bairros,
+  admin = false,
+}: {
+  bairros: string[];
+  admin?: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const [pendente, iniciar] = useTransition();
+  const statusVisiveis: readonly string[] = admin ? STATUS : STATUS_CORRETOR;
 
   function aplicar(chave: string, valor: string) {
     const novos = new URLSearchParams(params.toString());
@@ -81,7 +91,7 @@ export default function Filtros({ bairros }: { bairros: string[] }) {
           onChange={(e) => aplicar("status", e.target.value)}
         >
           <option value="">Todos (menos inválidos)</option>
-          {STATUS.map((s) => (
+          {statusVisiveis.map((s) => (
             <option key={s} value={s}>
               {s}
             </option>

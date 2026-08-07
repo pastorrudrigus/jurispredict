@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/supabase";
+import { dbUsuario } from "@/lib/supabase-usuario";
+import { exigirAcesso, exigirAdmin } from "@/lib/sessao";
 import type { Empreendimento } from "@/lib/types";
 
 export async function listarEmpreendimentos(): Promise<Empreendimento[]> {
-  const { data, error } = await db()
+  await exigirAcesso();
+  const { data, error } = await dbUsuario()
     .from("empreendimentos")
     .select("*")
     .order("nome");
@@ -45,14 +47,17 @@ export async function salvarEmpreendimento(
   _estadoAnterior: EmpreendimentoResultado | null,
   form: FormData,
 ): Promise<EmpreendimentoResultado> {
+  await exigirAdmin();
+
   const id = limpar(form.get("id"));
   const dados = campos(form);
 
   if (!dados.nome) return { ok: false, erro: "Nome é obrigatório." };
 
+  const sb = dbUsuario();
   const { error } = id
-    ? await db().from("empreendimentos").update(dados).eq("id", id)
-    : await db().from("empreendimentos").insert(dados);
+    ? await sb.from("empreendimentos").update(dados).eq("id", id)
+    : await sb.from("empreendimentos").insert(dados);
 
   if (error) return { ok: false, erro: error.message };
 
@@ -61,7 +66,8 @@ export async function salvarEmpreendimento(
 }
 
 export async function excluirEmpreendimento(id: string): Promise<void> {
-  const { error } = await db().from("empreendimentos").delete().eq("id", id);
+  await exigirAdmin();
+  const { error } = await dbUsuario().from("empreendimentos").delete().eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/empreendimentos");
 }

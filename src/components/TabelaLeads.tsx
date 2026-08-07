@@ -15,7 +15,13 @@ const CORES_STATUS: Record<string, string> = {
   invalido: "text-red-400",
 };
 
-export default function TabelaLeads({ leads }: { leads: Lead[] }) {
+export default function TabelaLeads({
+  leads,
+  admin = false,
+}: {
+  leads: Lead[];
+  admin?: boolean;
+}) {
   const router = useRouter();
   const [aberto, setAberto] = useState<Lead | null>(null);
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
@@ -38,11 +44,17 @@ export default function TabelaLeads({ leads }: { leads: Lead[] }) {
   if (leads.length === 0) {
     return (
       <div className="card p-8 text-center text-sm text-zinc-500">
-        Nenhum lead com esse filtro. Cole anúncios em{" "}
-        <a href="/ingerir" className="text-sky-300 hover:underline">
-          /ingerir
-        </a>
-        .
+        {admin ? (
+          <>
+            Nenhum lead com esse filtro. Cole anúncios em{" "}
+            <a href="/ingerir" className="text-sky-300 hover:underline">
+              /ingerir
+            </a>
+            .
+          </>
+        ) : (
+          "Nenhuma oportunidade com esse filtro no momento."
+        )}
       </div>
     );
   }
@@ -53,14 +65,16 @@ export default function TabelaLeads({ leads }: { leads: Lead[] }) {
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-edge text-left text-xs uppercase tracking-wide text-zinc-500">
-              <th className="w-8 px-3 py-2">
-                <input
-                  type="checkbox"
-                  aria-label="Selecionar todos"
-                  checked={selecionados.size === leads.length && leads.length > 0}
-                  onChange={alternarTodos}
-                />
-              </th>
+              {admin ? (
+                <th className="w-8 px-3 py-2">
+                  <input
+                    type="checkbox"
+                    aria-label="Selecionar todos"
+                    checked={selecionados.size === leads.length && leads.length > 0}
+                    onChange={alternarTodos}
+                  />
+                </th>
+              ) : null}
               <th className="px-3 py-2">Empreendimento</th>
               <th className="px-3 py-2">Bairro</th>
               <th className="px-3 py-2">Tipologia</th>
@@ -83,14 +97,16 @@ export default function TabelaLeads({ leads }: { leads: Lead[] }) {
                   onClick={() => setAberto(lead)}
                   className="cursor-pointer border-b border-edge/50 transition hover:bg-zinc-800/40"
                 >
-                  <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      aria-label={`Selecionar ${lead.empreendimento_texto ?? lead.id}`}
-                      checked={selecionados.has(lead.id)}
-                      onChange={() => alternar(lead.id)}
-                    />
-                  </td>
+                  {admin ? (
+                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Selecionar ${lead.empreendimento_texto ?? lead.id}`}
+                        checked={selecionados.has(lead.id)}
+                        onChange={() => alternar(lead.id)}
+                      />
+                    </td>
+                  ) : null}
                   <td className="max-w-[280px] px-3 py-2">
                     <span className="block truncate text-zinc-100">
                       {lead.empreendimentos?.nome ??
@@ -152,7 +168,7 @@ export default function TabelaLeads({ leads }: { leads: Lead[] }) {
         </table>
       </div>
 
-      {selecionados.size > 0 ? (
+      {admin && selecionados.size > 0 ? (
         <div className="sticky bottom-4 z-30 mx-auto flex w-fit items-center gap-3 rounded-full border border-edge bg-panel px-4 py-2 shadow-lg">
           <span className="text-sm text-zinc-300">
             {selecionados.size} selecionado{selecionados.size === 1 ? "" : "s"}
@@ -172,7 +188,9 @@ export default function TabelaLeads({ leads }: { leads: Lead[] }) {
         </div>
       ) : null}
 
-      {aberto ? <DrawerLead lead={aberto} aoFechar={() => setAberto(null)} /> : null}
+      {aberto ? (
+        <DrawerLead lead={aberto} admin={admin} aoFechar={() => setAberto(null)} />
+      ) : null}
     </>
   );
 }

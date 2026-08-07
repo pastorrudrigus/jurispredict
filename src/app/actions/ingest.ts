@@ -3,6 +3,7 @@
 import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/supabase";
+import { exigirAdmin } from "@/lib/sessao";
 import { MODELO_EXTRACAO, extrairAnuncio } from "@/lib/anthropic";
 import { FONTES, type Fonte, type Lead, type ResultadoItem } from "@/lib/types";
 
@@ -36,6 +37,10 @@ export type LoteInput = {
  * IA, de JSON ou de banco marca só aquele item e o lote continua.
  */
 export async function ingerirLote(input: LoteInput): Promise<ResultadoItem[]> {
+  // Só o operador ingere. A partir daqui usamos service_role (que ignora RLS)
+  // — este gate é o que autoriza esse uso.
+  await exigirAdmin();
+
   const fonte: Fonte = (FONTES as readonly string[]).includes(input.fonte)
     ? (input.fonte as Fonte)
     : "outro";

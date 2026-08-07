@@ -4,6 +4,7 @@ import {
   listarLeads,
   totalSinaisJudiciais,
 } from "@/app/actions/leads";
+import { ehAdmin, exigirAcesso } from "@/lib/sessao";
 import Filtros from "@/components/Filtros";
 import TabelaLeads from "@/components/TabelaLeads";
 
@@ -40,6 +41,9 @@ export default async function PainelPage({
 }: {
   searchParams: Params;
 }) {
+  const sessao = await exigirAcesso();
+  const admin = ehAdmin(sessao);
+
   const urgencia = Number.parseInt(searchParams.urgencia ?? "", 10);
 
   const [leads, totais, bairros, sinaisJudiciais] = await Promise.all([
@@ -48,7 +52,7 @@ export default async function PainelPage({
       status: searchParams.status,
       urgenciaMinima: Number.isFinite(urgencia) ? urgencia : undefined,
       busca: searchParams.busca,
-      incluirInvalidos: searchParams.status === "invalido",
+      incluirInvalidos: admin && searchParams.status === "invalido",
     }),
     contadores(),
     bairrosDisponiveis(),
@@ -58,7 +62,17 @@ export default async function PainelPage({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="text-lg font-semibold text-zinc-100">Painel de leads</h1>
+        <div>
+          <h1 className="text-lg font-semibold text-zinc-100">
+            {admin ? "Painel de leads" : "Oportunidades de repasse"}
+          </h1>
+          {!admin ? (
+            <p className="mt-1 text-sm text-zinc-500">
+              Estoque de repasses captado hoje em Goiânia. Abra um card para ver o
+              anúncio original e falar direto com o vendedor.
+            </p>
+          ) : null}
+        </div>
         <div className="grid grid-flow-col gap-3">
           <Contador rotulo="Total" valor={totais.total} />
           <Contador rotulo="Novos hoje" valor={totais.novosHoje} destaque="text-sky-300" />
@@ -77,14 +91,14 @@ export default async function PainelPage({
         </div>
       </div>
 
-      <Filtros bairros={bairros} />
+      <Filtros bairros={bairros} admin={admin} />
 
       <p className="text-xs text-zinc-500">
         {leads.length} lead{leads.length === 1 ? "" : "s"} no filtro atual · ordenados
         por urgência
       </p>
 
-      <TabelaLeads leads={leads} />
+      <TabelaLeads leads={leads} admin={admin} />
     </div>
   );
 }

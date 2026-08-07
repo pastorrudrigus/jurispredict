@@ -1,4 +1,5 @@
 import { bairrosDisponiveis, leadsPorIds, listarLeads } from "@/app/actions/leads";
+import { exigirAdmin } from "@/lib/sessao";
 import Filtros from "@/components/Filtros";
 import GeradorLista from "./GeradorLista";
 
@@ -13,6 +14,8 @@ type Params = {
 };
 
 export default async function ListaPage({ searchParams }: { searchParams: Params }) {
+  await exigirAdmin();
+
   const ids = (searchParams.ids ?? "")
     .split(",")
     .map((s) => s.trim())
@@ -46,7 +49,7 @@ export default async function ListaPage({ searchParams }: { searchParams: Params
         </p>
       </div>
 
-      {ids.length === 0 ? <Filtros bairros={bairros} /> : null}
+      {ids.length === 0 ? <Filtros bairros={bairros} admin /> : null}
 
       <GeradorLista leads={leads} preSelecionados={ids} />
     </div>

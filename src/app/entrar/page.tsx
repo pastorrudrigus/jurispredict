@@ -1,9 +1,10 @@
 "use client";
 
-import { useFormState, useFormStatus } from "react-dom";
-import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Suspense } from "react";
-import { login, type LoginEstado } from "./actions";
+import { useSearchParams } from "next/navigation";
+import { useFormState, useFormStatus } from "react-dom";
+import { entrar, type AuthEstado } from "./actions";
 
 function Botao() {
   const { pending } = useFormStatus();
@@ -16,27 +17,35 @@ function Botao() {
 
 function Formulario() {
   const params = useSearchParams();
-  const [estado, action] = useFormState<LoginEstado | null, FormData>(login, null);
+  const [estado, action] = useFormState<AuthEstado | null, FormData>(entrar, null);
 
   return (
     <form action={action} className="card w-full max-w-sm space-y-4 p-6">
       <div>
         <h1 className="text-lg font-semibold text-zinc-100">📡 Radar Imob Goiânia</h1>
-        <p className="mt-1 text-sm text-zinc-500">Ferramenta interna. Acesso por senha.</p>
+        <p className="mt-1 text-sm text-zinc-500">
+          Repasses de imóveis na planta, estruturados e prontos para trabalhar.
+        </p>
       </div>
 
       <input type="hidden" name="next" value={params.get("next") ?? "/"} />
 
       <div>
+        <label className="label" htmlFor="email">
+          E-mail
+        </label>
+        <input id="email" name="email" type="email" autoComplete="email" required className="input" />
+      </div>
+
+      <div>
         <label className="label" htmlFor="senha">
-          Senha do painel
+          Senha
         </label>
         <input
           id="senha"
           name="senha"
           type="password"
           autoComplete="current-password"
-          autoFocus
           required
           className="input"
         />
@@ -49,11 +58,18 @@ function Formulario() {
       ) : null}
 
       <Botao />
+
+      <p className="text-center text-sm text-zinc-500">
+        Ainda não tem conta?{" "}
+        <Link href="/cadastrar" className="text-sky-300 hover:underline">
+          Cadastre-se
+        </Link>
+      </p>
     </form>
   );
 }
 
-export default function LoginPage() {
+export default function EntrarPage() {
   return (
     <div className="flex min-h-[70vh] items-center justify-center">
       <Suspense>

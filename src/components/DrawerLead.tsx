@@ -21,9 +21,11 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: React.ReactNode }) {
 export default function DrawerLead({
   lead,
   aoFechar,
+  admin = false,
 }: {
   lead: Lead;
   aoFechar: () => void;
+  admin?: boolean;
 }) {
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
@@ -71,18 +73,24 @@ export default function DrawerLead({
             >
               🔥 {lead.score_urgencia ?? 0}/100
             </span>
-            <select
-              className="input w-auto"
-              value={status}
-              onChange={(e) => mudarStatus(e.target.value)}
-              disabled={pendente}
-            >
-              {STATUS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
+            {admin ? (
+              <select
+                className="input w-auto"
+                value={status}
+                onChange={(e) => mudarStatus(e.target.value)}
+                disabled={pendente}
+              >
+                {STATUS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="rounded border border-edge px-2 py-1 text-sm text-zinc-400">
+                {status}
+              </span>
+            )}
             <BotaoCopiar texto={pitch} rotulo="Copiar pitch" />
             <a
               className="btn btn-wa"

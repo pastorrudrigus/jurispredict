@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/supabase";
+import { dbUsuario } from "@/lib/supabase-usuario";
+import { exigirAcesso, exigirAdmin } from "@/lib/sessao";
 import { STATUS, type Lead } from "@/lib/types";
 
 const SELECT =
@@ -16,8 +17,14 @@ export type FiltroLeads = {
   limite?: number;
 };
 
+/**
+ * Leitura do pool. Roda com a sessão do usuário, então o RLS decide o que cada
+ * papel enxerga: corretor não vê `invalido`/`expirado`, admin vê tudo.
+ */
 export async function listarLeads(filtro: FiltroLeads = {}): Promise<Lead[]> {
-  let q = db()
+  await exigirAcesso();
+
+  let q = dbUsuario()
     .from("anuncios_repasse")
     .select(SELECT)
     .order("score_urgencia", { ascending: false, nullsFirst: false })
@@ -45,8 +52,10 @@ export async function listarLeads(filtro: FiltroLeads = {}): Promise<Lead[]> {
 }
 
 export async function leadsPorIds(ids: string[]): Promise<Lead[]> {
+  await exigirAcesso();
   if (ids.length === 0) return [];
-  const { data, error } = await db()
+
+  const { data, error } = await dbUsuario()
     .from("anuncios_repasse")
     .select(SELECT)
     .in("id", ids)
@@ -56,10 +65,11 @@ export async function leadsPorIds(ids: string[]): Promise<Lead[]> {
 }
 
 export async function atualizarStatus(id: string, status: string): Promise<void> {
+  await exigirAdmin();
   if (!(STATUS as readonly string[]).includes(status)) {
     throw new Error(`Status inválido: ${status}`);
   }
-  const { error } = await db()
+  const { error } = await dbUsuario()
     .from("anuncios_repasse")
     .update({ status })
     .eq("id", id);
@@ -69,8 +79,10 @@ export async function atualizarStatus(id: string, status: string): Promise<void>
 }
 
 export async function marcarDistribuidos(ids: string[]): Promise<number> {
+  await exigirAdmin();
   if (ids.length === 0) return 0;
-  const { error, count } = await db()
+
+  const { error, count } = await dbUsuario()
     .from("anuncios_repasse")
     .update({ status: "distribuido" }, { count: "exact" })
     .in("id", ids);
@@ -87,8 +99,10 @@ export type Contadores = {
 };
 
 export async function contadores(): Promise<Contadores> {
+  await exigirAcesso();
+
   const base = () =>
-    db()
+    dbUsuario()
       .from("anuncios_repasse")
       .select("*", { count: "exact", head: true })
       .neq("status", "invalido");
@@ -111,13 +125,16 @@ export async function contadores(): Promise<Contadores> {
 
 /** Bairros distintos já capturados, para popular o filtro. */
 export async function bairrosDisponiveis(): Promise<string[]> {
-  const { data, error } = await db()
+  await exigirAcesso();
+
+  const { data, error } = await dbUsuario()
     .from("anuncios_repasse")
     .select("bairro")
     .neq("status", "invalido")
     .not("bairro", "is", null)
     .limit(1000);
   if (error) return [];
+
   const set = new Set<string>();
   for (const linha of data ?? []) {
     const b = (linha as { bairro: string | null }).bairro;
@@ -128,7 +145,7 @@ export async function bairrosDisponiveis(): Promise<string[]> {
 
 /** P1 — contagem de sinais judiciais coletados do DataJud. */
 export async function totalSinaisJudiciais(): Promise<number | null> {
-  const { count, error } = await db()
+  const { count, error } = await dbUsuario()
     .from("sinais_judiciais")
     .select("*", { count: "exact", head: true })
     .gte("data_ajuizamento", "2023-01-01");
