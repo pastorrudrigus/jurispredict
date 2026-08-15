@@ -19,11 +19,14 @@ function autorizado(req: NextRequest): boolean {
 const ACTOR = "haketa~zapimoveis-scraper";
 
 // Faixas onde o repasse/ágio se concentra. Cada rodada varre uma; juntas
-// cobrem estúdio barato até apartamento de médio padrão.
+// cobrem estúdio barato até apartamento de alto padrão + casa de condomínio.
+// Como o cron é diário (limite do plano), varre largo de uma vez.
 const FAIXAS = [
-  { unitTypes: ["KITNET", "FLAT", "APARTMENT"], minPrice: 50000, maxPrice: 250000 },
+  { unitTypes: ["KITNET", "FLAT"], minPrice: 40000, maxPrice: 200000 },
+  { unitTypes: ["APARTMENT"], minPrice: 60000, maxPrice: 250000 },
   { unitTypes: ["APARTMENT"], minPrice: 250000, maxPrice: 400000 },
-  { unitTypes: ["APARTMENT", "PENTHOUSE"], minPrice: 400000, maxPrice: 600000 },
+  { unitTypes: ["APARTMENT", "PENTHOUSE"], minPrice: 400000, maxPrice: 700000 },
+  { unitTypes: ["HOME", "CONDOMINIUM"], minPrice: 150000, maxPrice: 600000 },
 ];
 
 type ItemZap = Record<string, unknown>;
