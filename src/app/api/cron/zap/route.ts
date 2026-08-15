@@ -48,7 +48,11 @@ function mapear(d: ItemZap) {
     bairro: d.neighborhood as string | undefined,
     cidade: (d.city as string) ?? "Goiânia",
     telefone: phones as string | null,
-    nome_anunciante: (d.advertiserName ?? d.agencyName) as string | undefined,
+    nome_anunciante: (d.agencyName ?? d.advertiserName) as string | undefined,
+    // sinais estruturados de quem anuncia — o ZAP é ~100% imobiliária
+    publisher_type: d.publisherType as string | undefined,
+    agencia: d.agencyName as string | undefined,
+    creci: d.agencyCRECI as string | undefined,
   };
 }
 

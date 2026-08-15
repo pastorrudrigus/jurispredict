@@ -53,6 +53,11 @@ type ItemPortal = {
   telefone?: string;
   nome_anunciante?: string;
   empreendimento?: string;
+  /** Sinais estruturados de quem anuncia (do portal). Muito mais confiável
+   *  que a IA lendo texto. publisher_type='agency' + agencia = imobiliária. */
+  publisher_type?: string;
+  agencia?: string;
+  creci?: string;
 };
 
 export async function POST(req: Request) {
@@ -127,6 +132,14 @@ export async function POST(req: Request) {
       continue;
     }
 
+    // Sinal ESTRUTURADO de quem anuncia (do portal). É definitivo: se o ZAP
+    // diz agency + tem nome de imobiliária/CRECI, é imobiliária, ponto. Muito
+    // mais confiável que a IA lendo o texto (onde a imobiliária se disfarça).
+    const ehImobiliaria =
+      item.publisher_type === "agency" ||
+      !!(item.agencia && item.agencia.trim()) ||
+      !!(item.creci && item.creci.trim());
+
     // Dedup: prioriza URL do anúncio, senão hash do texto
     const chave = item.url
       ? `${fonte}${item.url}`
@@ -135,11 +148,27 @@ export async function POST(req: Request) {
 
     const { data: existente } = await supabase
       .from("anuncios_repasse")
-      .select("id")
+      .select("id, anunciante_tipo")
       .eq("hash_dedup", hashDedup)
       .maybeSingle();
     if (existente) {
-      resultados.push({ url: item.url, situacao: "duplicado", id: existente.id });
+      // Reclassifica o que já estava salvo sem tipo, agora que temos o sinal.
+      const jaTipado = (existente as { anunciante_tipo?: string }).anunciante_tipo;
+      if (ehImobiliaria && jaTipado !== "imobiliaria") {
+        await supabase
+          .from("anuncios_repasse")
+          .update({
+            anunciante_tipo: "imobiliaria",
+            anunciante_confianca: 95,
+            sinais_anunciante: [
+              item.agencia ? `agência: ${item.agencia}` : "publisher_type=agency",
+            ],
+          })
+          .eq("id", (existente as { id: string }).id);
+        resultados.push({ url: item.url, situacao: "reclassificado_imobiliaria" });
+      } else {
+        resultados.push({ url: item.url, situacao: "duplicado", id: (existente as { id: string }).id });
+      }
       continue;
     }
 
@@ -192,7 +221,22 @@ export async function POST(req: Request) {
       }
     }
 
-    const classe = classeLead(extraido);
+    // Tipo de anunciante: sinal estruturado do portal manda; senão a IA.
+    const anuncianteTipo = ehImobiliaria
+      ? "imobiliaria"
+      : (extraido.anunciante_tipo ?? "indefinido");
+    const anuncianteConfianca = ehImobiliaria
+      ? 95
+      : (extraido.anunciante_confianca ?? 0);
+    const sinaisAnunciante = ehImobiliaria
+      ? [item.agencia ? `agência: ${item.agencia}` : "publisher_type=agency"]
+      : (extraido.sinais_anunciante ?? []);
+
+    // A classe usa o tipo REAL (com o override da imobiliária), não só o da IA.
+    const classe = classeLead({
+      anunciante_tipo: anuncianteTipo,
+      score_urgencia: extraido.score_urgencia,
+    });
     const scoreFinal = aplicarBonusJanela(
       extraido.score_urgencia ?? 0,
       classe,
@@ -219,6 +263,9 @@ export async function POST(req: Request) {
         nome_contato: nome,
         score_urgencia: scoreFinal,
         sinais_urgencia: extraido.sinais_urgencia ?? [],
+        anunciante_tipo: anuncianteTipo,
+        anunciante_confianca: anuncianteConfianca,
+        sinais_anunciante: sinaisAnunciante,
         status: "novo",
         extraido_em: new Date().toISOString(),
         modelo_extracao: MODELO_EXTRACAO,
