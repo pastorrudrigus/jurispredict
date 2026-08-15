@@ -110,10 +110,12 @@ export async function POST(req: Request) {
       continue;
     }
 
-    // Filtro de cidade quando o scraper informa
+    // Filtro de cidade quando o scraper informa (normaliza acento)
     if (cidadesAlvo.length > 0 && item.cidade) {
-      const cid = item.cidade.toLowerCase();
-      if (!cidadesAlvo.some((c) => cid.includes(c))) {
+      const semAcento = (s: string) =>
+        s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+      const cid = semAcento(item.cidade);
+      if (!cidadesAlvo.some((c) => cid.includes(semAcento(c)))) {
         resultados.push({ url: item.url, situacao: "fora_da_regiao" });
         continue;
       }
