@@ -7,6 +7,9 @@ Aplicativo de demonstração para compras de um **mix de produtos** com destino 
 - **Entrega e transporte**: laboratório local de custo posto por produto e modal (rodoviário, ferroviário, aéreo e cabotagem). Não altera a arena.
 - Também há **Cotações-base**, **Pedidos**, **Verbas** (teto de desembolso e prazo máximo), **Catálogo** (estoque, validade e vida mínima) e **Auditoria**.
 
+- **Controle de acesso**: login com e-mail e senha, perfis (administrador, comprador, somente leitura), gestão de usuários, troca obrigatória de senha temporária e auditoria por usuário.
+- **Visão inteligente**, **Fornecedores** (scorecard), **Nova cotação** e **Importar mix (CSV)**, **Matriz por item**, notificações, tema claro/escuro e layout responsivo.
+
 > Todos os fornecedores, preços, estoques, origens e perfis fiscais são **sintéticos e hipotéticos**. Nenhuma compra externa é transmitida e nenhum resultado substitui validação documental ou profissional.
 
 ## Como executar
@@ -24,12 +27,21 @@ Produção (API e interface no mesmo processo, porta 3001):
 pnpm build && pnpm start
 ```
 
+### Primeiro acesso
+
+Na primeira inicialização o servidor cria o administrador inicial:
+
+- com `MIXCERTO_ADMIN_EMAIL` e `MIXCERTO_ADMIN_PASSWORD` definidos, usa esses valores;
+- sem senha definida, gera uma senha temporária e a mostra **uma vez** no log do servidor (e-mail padrão `admin@mixcerto.local`); a troca é exigida no primeiro login.
+
+Depois, em **Usuários e acessos**, o administrador convida compradores e leitores com senha temporária.
+
 Os dados ficam em `data/db.json` (ou no arquivo apontado por `MIXCERTO_DB`). Use **Catálogo → Restaurar demonstração** ou `POST /api/demo/reset` para voltar ao estado inicial.
 
 ### Deploy no Render
 
 O `render.yaml` na raiz do repositório declara o serviço `mixcerto` (Docker, `rootDir: mixcerto`, health check em `/api/health`).
-No Render: **New + → Blueprint**, conecte o repositório e escolha a branch. O serviço sobe em `https://mixcerto-xxxx.onrender.com`.
+No Render: **New + → Blueprint**, conecte o repositório e escolha a branch. O Render pede `MIXCERTO_ADMIN_EMAIL` e `MIXCERTO_ADMIN_PASSWORD` (mín. 10 caracteres, letras e números). O serviço sobe em `https://mixcerto-xxxx.onrender.com`.
 No plano gratuito o disco é efêmero: os dados de demonstração voltam ao estado inicial a cada reinício ou novo deploy.
 
 ### Testes e verificação
@@ -37,7 +49,7 @@ No plano gratuito o disco é efêmero: os dados de demonstração voltam ao esta
 ```bash
 pnpm test           # vitest: motor competitivo, fiscal, transporte e fluxo HTTP
 pnpm typecheck
-python3 scripts/competition-http-smoke.py   # com `pnpm dev` saudável
+MIXCERTO_EMAIL=... MIXCERTO_PASSWORD=... python3 scripts/competition-http-smoke.py   # com `pnpm dev` saudável
 ```
 
 A demonstração HTTP cria somente uma arena e um pedido sintéticos e percorre: rodadas, limite de rodadas, conflito de versão, cotação-base sem atalho, encerramento, bloqueio pós-encerramento, falta não reconhecida, aceite parcial, pedido reconciliado e idempotência.
@@ -72,14 +84,30 @@ Na execução de referência (`scripts/competition-http-smoke.py`), Abastece Min
 |---|---|---|
 | GET/POST | `/api/arenas` | Lista / cria nova arena (não exclui as anteriores) |
 | GET | `/api/arenas/:id` | Arena com ranking, explicação e alerta de divergência de cesta |
+| POST | `/api/arenas` com `{ mix: [{ productId, quantity }], title }` | Nova cotação / mix importado |
 | POST | `/api/arenas/:id/rodadas` | Simula a próxima rodada (`expectedVersion`) |
 | POST | `/api/arenas/:id/lances` | Redução acumulada manual (`supplierId`, `reductionPct`, `expectedVersion`) |
 | PUT | `/api/arenas/:id/propostas/:supplierId/logistica` | Ajusta frete (`terms`, `expectedVersion`) |
 | POST | `/api/arenas/:id/encerrar` | Revalida cesta e ofertas e seleciona o vencedor |
 | POST | `/api/arenas/:id/pedido` | Gera pedido (`expectedVersion`, `acknowledgeShortage`) — idempotente |
 | GET | `/api/cotacoes` · POST `/api/cotacoes/:arenaId/pedido` | Cotação-base; o pedido delega às mesmas regras |
-| GET | `/api/pedidos`, `/api/auditoria`, `/api/catalogo`, `/api/verbas` | Consultas |
+| GET | `/api/pedidos`, `/api/auditoria`, `/api/catalogo`, `/api/verbas`, `/api/fornecedores` | Consultas |
+| POST | `/api/auth/login`, `/api/auth/logout`, `/api/auth/password` · GET `/api/auth/me` | Sessão e senha |
+| GET/POST/PATCH | `/api/usuarios` | Gestão de usuários (administrador) |
 | PATCH | `/api/catalogo/ofertas/:s/:p`, `/api/catalogo/produtos/:p`, `/api/verbas/:id` | Edições de catálogo e verba |
+
+## Segurança e controle de acesso
+
+| Item | Implementação |
+|---|---|
+| Senhas | `scrypt` com sal aleatório por usuário; mínimo de 10 caracteres com letras e números |
+| Sessão | token aleatório de 256 bits em cookie `HttpOnly`, `SameSite=Strict` e `Secure` sob HTTPS; servidor guarda só o SHA-256; expira em 8 h |
+| Força bruta | bloqueio de 15 min após 5 falhas por conta; limite por IP; mensagem genérica e tempo constante para e-mail inexistente |
+| CSRF | escritas exigem o cabeçalho `X-MixCerto: 1`, além do cookie SameSite=Strict |
+| Perfis | **Administrador**: tudo, inclusive verbas, usuários e restauração · **Comprador**: cotações, arena, frete, catálogo e pedidos · **Somente leitura**: consulta |
+| Ciclo de vida | troca obrigatória da senha temporária; redefinir senha ou desativar encerra sessões; o admin não remove o próprio acesso |
+| Auditoria | logins, falhas, alterações de usuários e todas as ações de compra com o e-mail do responsável |
+| Cabeçalhos | `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin` |
 
 ## Próximos passos para operação real
 

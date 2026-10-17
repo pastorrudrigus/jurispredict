@@ -3,24 +3,28 @@
 Demonstração reproduzível da arena pela API HTTP (somente dados sintéticos; nenhuma compra externa).
 
 Uso: com `pnpm dev` (ou `npm run dev:api`) saudável, execute
-    python3 scripts/competition-http-smoke.py [--base http://localhost:3001/api]
+    MIXCERTO_EMAIL=... MIXCERTO_PASSWORD=... python3 scripts/competition-http-smoke.py [--base http://localhost:3001/api]
+O usuário precisa do perfil comprador ou administrador (e já ter trocado a senha temporária).
 """
 import argparse
+import http.cookiejar
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
 
 steps = 0
+opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 
 
 def call(base, method, path, body=None, expect=None):
     global steps
     steps += 1
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(base + path, data=data, method=method, headers={"content-type": "application/json"})
+    req = urllib.request.Request(base + path, data=data, method=method, headers={"content-type": "application/json", "x-mixcerto": "1"})
     try:
-        with urllib.request.urlopen(req) as r:
+        with opener.open(req) as r:
             status, payload = r.status, json.loads(r.read() or b"{}")
     except urllib.error.HTTPError as e:
         status, payload = e.code, json.loads(e.read() or b"{}")
@@ -44,6 +48,9 @@ def main():
     base = ap.parse_args().base
 
     call(base, "GET", "/health", expect=200)
+    call(base, "GET", "/arenas", expect=401)  # sem login
+    call(base, "POST", "/auth/login", {"email": os.environ.get("MIXCERTO_EMAIL", "admin@mixcerto.local"),
+                                       "password": os.environ.get("MIXCERTO_PASSWORD", "")}, expect=200)
     a = call(base, "POST", "/arenas", {}, expect=201)
     aid, v = a["id"], a["version"]
     print(f"    cesta: {len(a['basket'])} itens; indisponível: {', '.join(u['productName'] for u in a['unavailable'])}")

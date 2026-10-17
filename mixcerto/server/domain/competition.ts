@@ -3,7 +3,9 @@ import {
   computeBasket,
   evaluateProposal,
   explainSelection,
+  itemMatrix,
   rankProposals,
+  type BasketItem,
   type Arena,
   type ArenaView,
   type Catalog,
@@ -15,13 +17,40 @@ import {
 import { DEFAULT_DESTINATION, type AuditEvent, type LogisticsTerms } from "../../shared/contracts";
 import { validateLogistics } from "../../shared/transport";
 import { INITIAL_LOGISTICS } from "../seed";
+import type { Role } from "../../shared/auth";
+import { currentActor } from "../context";
+
+export interface UserRecord {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  active: boolean;
+  mustChangePassword: boolean;
+  /** scrypt: "salt:hash" em hex. */
+  passwordHash: string;
+  createdAt: string;
+  lastLoginAt: string | null;
+  failedLogins: number;
+  lockedUntil: string | null;
+}
+
+export interface SessionRecord {
+  /** SHA-256 do token — o token em si só existe no cookie do navegador. */
+  tokenHash: string;
+  userId: string;
+  createdAt: string;
+  expiresAt: string;
+}
 
 export interface Db {
   catalog: Catalog;
   arenas: Arena[];
   orders: Order[];
   audit: AuditEvent[];
-  seq: { arena: number; order: number; audit: number };
+  users: UserRecord[];
+  sessions: SessionRecord[];
+  seq: { arena: number; order: number; audit: number; user: number };
 }
 
 export class DomainError extends Error {
@@ -32,7 +61,7 @@ export class DomainError extends Error {
 
 const dateOf = (now: string) => now.slice(0, 10);
 
-export function audit(db: Db, now: string, action: string, entity: string, detail: string, actor = "comprador") {
+export function audit(db: Db, now: string, action: string, entity: string, detail: string, actor = currentActor()) {
   db.audit.push({ id: ++db.seq.audit, at: now, actor, action, entity, detail });
 }
 
@@ -61,10 +90,11 @@ export function evaluateArena(db: Db, a: Arena, now: string): RankedProposal[] {
 
 export function viewArena(db: Db, a: Arena, now: string): ArenaView {
   const ranking = evaluateArena(db, a, now);
-  const current = computeBasket(db.catalog, dateOf(now));
+  const current = computeBasket(db.catalog, dateOf(now), a.mix);
   return {
     ...a,
     ranking,
+    matrix: itemMatrix(ranking, db.catalog),
     explanation: explainSelection(ranking),
     basketDrift: basketKey(current.basket) !== basketKey(a.basket),
     simulatedRoundsUsed: a.rounds.filter((r) => r.kind === "simulada").length,
@@ -93,10 +123,28 @@ function pushTimeline(db: Db, a: Arena, now: string, label: string) {
   });
 }
 
-export function createArena(db: Db, opts: { budgetId?: string }, now: string): Arena {
+/** Valida e normaliza o mix informado (Nova cotação / Importar mix). Sem mix, usa o mix original. */
+export function normalizeMix(db: Db, raw: unknown): BasketItem[] {
+  if (raw === undefined || raw === null) return db.catalog.products.map((p) => ({ productId: p.id, quantity: p.quantity }));
+  if (!Array.isArray(raw) || !raw.length) throw new DomainError(400, "INVALID_MIX", "Informe ao menos um item no mix.");
+  if (raw.length > 500) throw new DomainError(400, "INVALID_MIX", "Mix grande demais.");
+  const merged = new Map<string, number>();
+  for (const it of raw) {
+    const id = (it as BasketItem)?.productId;
+    const q = Number((it as BasketItem)?.quantity);
+    if (!db.catalog.products.some((p) => p.id === id)) throw new DomainError(400, "UNKNOWN_PRODUCT", `Produto desconhecido: ${String(id)}.`);
+    if (!Number.isInteger(q) || q <= 0 || q > 1_000_000) throw new DomainError(400, "INVALID_QUANTITY", `Quantidade inválida para ${id}.`);
+    merged.set(id, (merged.get(id) ?? 0) + q);
+  }
+  return [...merged].map(([productId, quantity]) => ({ productId, quantity }));
+}
+
+export function createArena(db: Db, opts: { budgetId?: string; mix?: unknown; title?: unknown }, now: string): Arena {
   const budget = db.catalog.budgets.find((b) => b.id === (opts.budgetId ?? db.catalog.budgets[0]?.id));
   if (!budget) throw new DomainError(400, "BUDGET_NOT_FOUND", "Verba não encontrada.");
-  const { basket, unavailable } = computeBasket(db.catalog, dateOf(now));
+  const mix = normalizeMix(db, opts.mix);
+  const title = typeof opts.title === "string" && opts.title.trim() ? opts.title.trim().slice(0, 80) : opts.mix ? "Mix personalizado" : "Mix padrão";
+  const { basket, unavailable } = computeBasket(db.catalog, dateOf(now), mix);
   if (!basket.length) throw new DomainError(409, "EMPTY_BASKET", "Nenhum item do mix pode ser atendido.");
   const seq = ++db.seq.arena;
   const a: Arena = {
@@ -106,6 +154,8 @@ export function createArena(db: Db, opts: { budgetId?: string }, now: string): A
     today: dateOf(now),
     status: "aberta",
     version: 1,
+    title,
+    mix,
     params: {
       destination: { ...DEFAULT_DESTINATION },
       budgetId: budget.id,
@@ -163,7 +213,7 @@ export function simulateRound(db: Db, arenaId: string, expectedVersion: unknown,
     fromPct: from, toPct: p.reductionPct, leaderBefore: lead.supplierId, leaderAfter: after?.supplierId ?? null,
   });
   pushTimeline(db, a, now, `Rodada ${used + 1}: ${challenger.supplierName} −${p.reductionPct}%`);
-  audit(db, now, "arena.rodada", a.id, `${challenger.supplierName}: ${from}% → ${p.reductionPct}%`, "simulador");
+  audit(db, now, "arena.rodada", a.id, `${challenger.supplierName}: ${from}% → ${p.reductionPct}%`, `${currentActor()} (simulador)`);
   return a;
 }
 
@@ -234,7 +284,7 @@ function sanitizeTerms(raw: unknown): LogisticsTerms {
 }
 
 function requireSameBasket(db: Db, a: Arena, now: string) {
-  const current = computeBasket(db.catalog, dateOf(now));
+  const current = computeBasket(db.catalog, dateOf(now), a.mix);
   if (basketKey(current.basket) !== basketKey(a.basket))
     throw new DomainError(409, "BASKET_CHANGED",
       "A cesta atendível mudou (estoque, validade ou vida mínima). Crie uma nova arena: retirar itens da base não pode parecer economia de negociação.",
@@ -353,5 +403,5 @@ export function createOrder(
 }
 
 export function newDb(catalog: Catalog): Db {
-  return { catalog, arenas: [], orders: [], audit: [], seq: { arena: 0, order: 0, audit: 0 } };
+  return { catalog, arenas: [], orders: [], audit: [], users: [], sessions: [], seq: { arena: 0, order: 0, audit: 0, user: 0 } };
 }

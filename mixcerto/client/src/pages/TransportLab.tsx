@@ -6,6 +6,7 @@ import { brl } from "../../../shared/money";
 import { describeResponsibility, incrementalFreight, logisticsTotal, validateLogistics } from "../../../shared/transport";
 import { api } from "../api";
 import { LogisticsForm } from "../components/LogisticsForm";
+import { PageHead } from "../components/ui";
 
 interface TransportOption { id: string; label: string; originUf: UF; unitCents: number; terms: LogisticsTerms }
 interface LabState { productId: string; quantity: number; destinationUf: UF; options: TransportOption[] }
@@ -49,8 +50,7 @@ export default function TransportLab() {
 
   return (
     <>
-      <h1>Entrega e transporte</h1>
-      <p className="sub">Laboratório local para comparar o custo posto por produto. <b>Não altera</b> a arena, pedidos ou condições comerciais — para isso use “Ajustar frete” na central.</p>
+      <PageHead eyebrow="Inteligência logística" title="Frete pago ou absorvido." sub={<>Laboratório local para comparar o custo posto por produto. <b>Não altera</b> a arena, pedidos ou condições comerciais — para isso use “Ajustar frete” na arena.</>} />
       <div className="alert info small">
         Rodoviário, ferroviário, aéreo e cabotagem são possibilidades declaradas. Não foram consultadas rotas, capacidades ou transportadoras reais.
         Cabotagem até Brasília precisa de trecho terrestre final: valor e prazo devem abranger a combinação.

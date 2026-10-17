@@ -9,6 +9,7 @@ import {
   simulateTax, type OriginProfile, type Purpose, type Regime, type StMode, type TaxScenario,
 } from "../../../shared/tax-simulator";
 import { download, ORIGIN_COLORS, toCsv } from "../api";
+import { PageHead } from "../components/ui";
 
 const UFS: UF[] = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT","PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"];
 const r$ = (c: number) => (c / 100).toFixed(2);
@@ -74,8 +75,7 @@ export default function TaxLab() {
 
   return (
     <>
-      <h1>Inteligência tributária</h1>
-      <p className="sub">Planejamento por cenário, não por “estado universalmente melhor”. Mesmo produto, embalagem e quantidade; cinco origens hipotéticas.</p>
+      <PageHead eyebrow="Laboratório tributário" title="O crédito muda a conta?" sub="Planejamento por cenário, não por “estado universalmente melhor”. Mesmo produto, embalagem e quantidade; cinco origens hipotéticas." />
 
       <div className="alert info small">
         Perfis de origem, preços, alíquotas, MVA e benefícios são <b>hipóteses editáveis</b>, não uma base fiscal cadastrada nem lista de estados com benefícios comprovados.
@@ -84,7 +84,7 @@ export default function TaxLab() {
       </div>
 
       <div className="card">
-        <div className="row" style={{ justifyContent: "space-between" }}>
+        <div className="card-head">
           <h2>Cenário</h2>
           <div className="row">
             <button className="primary" onClick={runExample}>Exemplificar crédito fiscal</button>

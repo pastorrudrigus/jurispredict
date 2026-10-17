@@ -4,16 +4,26 @@ export class ApiFailure extends Error {
   }
 }
 
+/** Disparado quando a sessão expira ou a senha precisa ser trocada — o App reage. */
+export const AUTH_EVENT = "mixcerto:auth";
+
 export async function api<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`/api${path}`, {
     method,
-    headers: body !== undefined ? { "content-type": "application/json" } : undefined,
+    credentials: "same-origin",
+    headers: { "x-mixcerto": "1", ...(body !== undefined ? { "content-type": "application/json" } : {}) },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiFailure(res.status, data.code ?? "HTTP", data.error ?? `Erro HTTP ${res.status}`, data.details);
+  if (!res.ok) {
+    if ((res.status === 401 && path !== "/auth/login") || data.code === "PASSWORD_CHANGE_REQUIRED")
+      window.dispatchEvent(new CustomEvent(AUTH_EVENT, { detail: data.code }));
+    throw new ApiFailure(res.status, data.code ?? "HTTP", data.error ?? `Erro HTTP ${res.status}`, data.details);
+  }
   return data as T;
 }
+
+export const errorText = (e: unknown) => (e instanceof ApiFailure ? e.message : String(e));
 
 export function download(filename: string, content: string, type = "application/json") {
   const url = URL.createObjectURL(new Blob([content], { type }));
@@ -35,10 +45,16 @@ export function toCsv(rows: Record<string, unknown>[]): string {
 }
 
 export const SUPPLIER_COLORS: Record<string, string> = {
-  s1: "#2563eb",
-  s2: "#d97706",
-  s3: "#059669",
+  s1: "#2f6fd6",
+  s2: "#e08a1e",
+  s3: "#16a34a",
   s4: "#7c3aed",
   s5: "#db2777",
 };
-export const ORIGIN_COLORS = ["#2563eb", "#d97706", "#059669", "#7c3aed", "#db2777"];
+export const ORIGIN_COLORS = ["#2f6fd6", "#e08a1e", "#16a34a", "#7c3aed", "#db2777"];
+
+/** Navegação por hash com parâmetros: #/arena?id=arena-2 */
+export const go = (path: string) => {
+  location.hash = path;
+};
+export const hashParam = (k: string) => new URLSearchParams(location.hash.split("?")[1] ?? "").get(k);

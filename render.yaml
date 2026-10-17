@@ -28,3 +28,8 @@ services:
     envVars:
       - key: PORT
         value: 3001
+      # Administrador inicial: o Render pede os valores ao criar o Blueprint (não ficam no repositório).
+      - key: MIXCERTO_ADMIN_EMAIL
+        sync: false
+      - key: MIXCERTO_ADMIN_PASSWORD
+        sync: false

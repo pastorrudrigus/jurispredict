@@ -81,9 +81,9 @@ const offerOf = (c: Catalog, supplierId: string, productId: string) =>
   c.offers.find((o) => o.supplierId === supplierId && o.productId === productId);
 
 /** Problema de uma oferta para atender o item, ou null se atende. */
-export function offerIssue(offer: SupplierOffer | undefined, product: Product, today: string): string | null {
+export function offerIssue(offer: SupplierOffer | undefined, product: Product, today: string, quantity = product.quantity): string | null {
   if (!offer) return "sem oferta na tabela";
-  if (offer.stock < product.quantity) return `estoque ${offer.stock} < ${product.quantity}`;
+  if (offer.stock < quantity) return `estoque ${offer.stock} < ${quantity}`;
   const life = daysBetween(today, offer.expiry);
   if (life < product.minShelfLifeDays) return `vida útil ${life}d < mínima ${product.minShelfLifeDays}d`;
   return null;
@@ -93,17 +93,20 @@ export function offerIssue(offer: SupplierOffer | undefined, product: Product, t
  * Cesta atendível: itens do mix que ao menos um fornecedor consegue atender
  * (estoque, validade e vida mínima). Os demais ficam explícitos como indisponíveis.
  */
-export function computeBasket(c: Catalog, today: string): { basket: BasketItem[]; unavailable: UnavailableItem[] } {
+export function computeBasket(c: Catalog, today: string, mix?: BasketItem[]): { basket: BasketItem[]; unavailable: UnavailableItem[] } {
   const basket: BasketItem[] = [];
   const unavailable: UnavailableItem[] = [];
-  for (const p of c.products) {
-    const issues = c.suppliers.map((s) => ({ s, issue: offerIssue(offerOf(c, s.id, p.id), p, today) }));
-    if (issues.some((i) => i.issue === null)) basket.push({ productId: p.id, quantity: p.quantity });
+  const wanted = mix ?? c.products.map((p) => ({ productId: p.id, quantity: p.quantity }));
+  for (const item of wanted) {
+    const p = c.products.find((x) => x.id === item.productId);
+    if (!p) continue;
+    const issues = c.suppliers.map((s) => ({ s, issue: offerIssue(offerOf(c, s.id, p.id), p, today, item.quantity) }));
+    if (issues.some((i) => i.issue === null)) basket.push({ productId: p.id, quantity: item.quantity });
     else
       unavailable.push({
         productId: p.id,
         productName: p.name,
-        quantity: p.quantity,
+        quantity: item.quantity,
         reason: issues.map((i) => `${i.s.name}: ${i.issue}`).join("; "),
       });
   }
@@ -129,7 +132,7 @@ export function evaluateProposal(
   const lines: EvaluatedLine[] = basket.map((item) => {
     const product = c.products.find((x) => x.id === item.productId)!;
     const offer = offerOf(c, p.supplierId, item.productId);
-    const issue = offerIssue(offer, product, today);
+    const issue = offerIssue(offer, product, today, item.quantity);
     if (issue) reasons.push(`${product.name}: ${issue}`);
     const unit = offer?.unitPriceCents ?? 0;
     return {
@@ -218,6 +221,43 @@ export function explainSelection(ranking: RankedProposal[]): string[] {
 
 const fmt = (c: Cents) => (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+/**
+ * Matriz por item: preço unitário de cada fornecedor e o melhor preço apto do item.
+ * Serve de diagnóstico — a arena compara a cesta inteira; dividir o pedido gera fretes adicionais.
+ */
+export interface ItemMatrixRow {
+  productId: string;
+  productName: string;
+  quantity: number;
+  cells: { supplierId: string; unitCents: Cents | null; ok: boolean; issue?: string }[];
+  bestSupplierId: string | null;
+  bestUnitCents: Cents | null;
+}
+
+export function itemMatrix(evals: ProposalEvaluation[], c: Catalog): ItemMatrixRow[] {
+  if (!evals.length) return [];
+  return evals[0].lines.map((l) => {
+    const cells = evals.map((e) => {
+      const line = e.lines.find((x) => x.productId === l.productId)!;
+      return {
+        supplierId: e.supplierId,
+        unitCents: line.totalCents ? Math.round(line.totalCents / line.quantity) : null,
+        ok: line.ok,
+        issue: line.issue,
+      };
+    });
+    const best = cells.filter((x) => x.ok && x.unitCents !== null).sort((a, b) => a.unitCents! - b.unitCents! || a.supplierId.localeCompare(b.supplierId))[0];
+    return {
+      productId: l.productId,
+      productName: c.products.find((p) => p.id === l.productId)?.name ?? l.productId,
+      quantity: l.quantity,
+      cells,
+      bestSupplierId: best?.supplierId ?? null,
+      bestUnitCents: best?.unitCents ?? null,
+    };
+  });
+}
+
 // ---------- Estado da arena (persistido) ----------
 
 export type ArenaStatus = "aberta" | "encerrada";
@@ -259,6 +299,10 @@ export interface Arena {
   today: string;
   status: ArenaStatus;
   version: number;
+  /** Nome da cotação (ex.: “Mix padrão”, “Importado: reposição março”). */
+  title: string;
+  /** Mix solicitado (itens e quantidades) — base para recalcular a cesta. */
+  mix: BasketItem[];
   params: ArenaParams;
   basket: BasketItem[];
   unavailable: UnavailableItem[];
@@ -271,6 +315,7 @@ export interface Arena {
 
 export interface ArenaView extends Arena {
   ranking: RankedProposal[];
+  matrix: ItemMatrixRow[];
   explanation: string[];
   /** A cesta atual (catálogo vivo) diverge da cesta congelada na arena? */
   basketDrift: boolean;
