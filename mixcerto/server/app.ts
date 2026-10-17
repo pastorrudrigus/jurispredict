@@ -1,9 +1,9 @@
 import express from "express";
 import fs from "node:fs";
 import path from "node:path";
-import { authMiddleware, authRoutes } from "./auth";
-import { competitionRoutes } from "./demo/competition-routes";
-import type { Store } from "./store";
+import { authMiddleware, authRoutes } from "./auth.js";
+import { competitionRoutes } from "./demo/competition-routes.js";
+import type { Store } from "./store.js";
 
 export function createApp(store: Store, staticDir?: string) {
   const app = express();
@@ -17,6 +17,7 @@ export function createApp(store: Store, staticDir?: string) {
   });
   app.use(express.json({ limit: "200kb" }));
   app.get("/api/health", (_req, res) => res.json({ ok: true }));
+  app.use("/api", store.middleware());
   const auth = authRoutes(store);
   app.use("/api", auth.pub);
   app.use("/api", authMiddleware(store));

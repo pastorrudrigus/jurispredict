@@ -1,6 +1,6 @@
-import type { Budget, LogisticsTerms, Product, Supplier, SupplierOffer } from "../shared/contracts";
-import { addDays, toCents } from "../shared/money";
-import type { Catalog } from "../shared/competition";
+import type { Budget, LogisticsTerms, Product, Supplier, SupplierOffer } from "../shared/contracts.js";
+import { addDays, toCents } from "../shared/money.js";
+import type { Catalog } from "../shared/competition.js";
 
 /**
  * Mix original de vinte produtos e cinco fornecedores FICTÍCIOS.

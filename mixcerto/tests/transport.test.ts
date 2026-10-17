@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { logisticsTotal, validateLogistics } from "../shared/transport";
-import type { LogisticsTerms } from "../shared/contracts";
+import { logisticsTotal, validateLogistics } from "../shared/transport.js";
+import type { LogisticsTerms } from "../shared/contracts.js";
 
 const base: LogisticsTerms = {
   sellerDelivers: true, contractedBy: "vendedor", paidBy: "comprador", freightIncluded: false, modals: ["rodoviario"],

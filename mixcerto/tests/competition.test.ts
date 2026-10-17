@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   closeArena, createArena, createOrder, newDb, simulateRound, submitBid, updateLogistics, viewArena, type Db,
-} from "../server/domain/competition";
-import { seedCatalog, INITIAL_LOGISTICS } from "../server/seed";
+} from "../server/domain/competition.js";
+import { seedCatalog, INITIAL_LOGISTICS } from "../server/seed.js";
 
 const NOW = "2026-10-17T12:00:00.000Z";
 const fresh = () => {

@@ -1,9 +1,9 @@
 import crypto from "node:crypto";
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { can, passwordProblem, type Permission, type PublicUser, type Role } from "../shared/auth";
-import { requestContext } from "./context";
-import { audit, DomainError, type Db, type UserRecord } from "./domain/competition";
-import type { Store } from "./store";
+import { can, passwordProblem, type Permission, type PublicUser, type Role } from "../shared/auth.js";
+import { requestContext } from "./context.js";
+import { audit, DomainError, type Db, type UserRecord } from "./domain/competition.js";
+import type { Store } from "./store.js";
 
 export const SESSION_COOKIE = "mixcerto_sid";
 const SESSION_HOURS = 8;

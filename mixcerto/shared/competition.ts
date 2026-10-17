@@ -1,6 +1,6 @@
-import type { Budget, Location, LogisticsTerms, Product, Supplier, SupplierOffer } from "./contracts";
-import { daysBetween, presentValue, type Cents } from "./money";
-import { incrementalFreight, logisticsTotal, validateLogistics } from "./transport";
+import type { Budget, Location, LogisticsTerms, Product, Supplier, SupplierOffer } from "./contracts.js";
+import { daysBetween, presentValue, type Cents } from "./money.js";
+import { incrementalFreight, logisticsTotal, validateLogistics } from "./transport.js";
 
 export interface ArenaParams {
   destination: Location;

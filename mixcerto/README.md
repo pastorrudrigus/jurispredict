@@ -36,7 +36,25 @@ Na primeira inicialização o servidor cria o administrador inicial:
 
 Depois, em **Usuários e acessos**, o administrador convida compradores e leitores com senha temporária.
 
-Os dados ficam em `data/db.json` (ou no arquivo apontado por `MIXCERTO_DB`). Use **Catálogo → Restaurar demonstração** ou `POST /api/demo/reset` para voltar ao estado inicial.
+Os dados ficam no Postgres de `DATABASE_URL` (ex.: Supabase) ou, sem ela, em `data/db.json` (ou no arquivo apontado por `MIXCERTO_DB`). Use **Catálogo → Restaurar demonstração** ou `POST /api/demo/reset` para voltar ao estado inicial.
+
+### Deploy na Vercel + Supabase (recomendado)
+
+A interface é publicada como site estático e a API como uma função serverless (`api/index.ts`). O estado fica no Postgres do Supabase, numa tabela `mixcerto_state` criada automaticamente no primeiro acesso. As escritas usam `SELECT … FOR UPDATE`, então funções concorrentes não sobrescrevem umas às outras.
+
+1. **Supabase** → seu projeto → *Connect* → copie a connection string do **Transaction pooler** (porta 6543).
+2. **Vercel** → *Add New → Project* → importe `pastorrudrigus/jurispredict` → **Root Directory: `mixcerto`**. O `vercel.json` já define build, saída e rotas.
+3. Em *Environment Variables*:
+
+| Variável | Valor |
+|---|---|
+| `DATABASE_URL` | connection string do Supabase (com a senha do banco) |
+| `MIXCERTO_ADMIN_EMAIL` | e-mail do administrador inicial |
+| `MIXCERTO_ADMIN_PASSWORD` | senha inicial (mín. 10 caracteres, letras e números) |
+
+4. *Deploy*. Os próximos pushes publicam automaticamente.
+
+Sem `DATABASE_URL`, a função usa memória efêmera (os dados se perdem) — serve só para teste. TLS com o Supabase é obrigatório; `MIXCERTO_DB_SSL=verify` ativa a verificação estrita do certificado quando a CA estiver disponível.
 
 ### Deploy no Render
 
@@ -47,7 +65,8 @@ No plano gratuito o disco é efêmero: os dados de demonstração voltam ao esta
 ### Testes e verificação
 
 ```bash
-pnpm test           # vitest: motor competitivo, fiscal, transporte e fluxo HTTP
+pnpm test           # vitest: motor competitivo, fiscal, transporte, HTTP e autenticação
+TEST_DATABASE_URL=postgresql://... pnpm test   # inclui os testes de persistência/concorrência em Postgres
 pnpm typecheck
 MIXCERTO_EMAIL=... MIXCERTO_PASSWORD=... python3 scripts/competition-http-smoke.py   # com `pnpm dev` saudável
 ```

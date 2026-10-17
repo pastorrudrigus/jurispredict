@@ -1,4 +1,4 @@
-import type { Cents } from "./money";
+import type { Cents } from "./money.js";
 
 export type UF =
   | "AC" | "AL" | "AM" | "AP" | "BA" | "CE" | "DF" | "ES" | "GO" | "MA" | "MG" | "MS" | "MT"

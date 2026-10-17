@@ -1,4 +1,4 @@
-import type { LogisticsTerms, Modal, UF } from "./contracts";
+import type { LogisticsTerms, Modal, UF } from "./contracts.js";
 
 /** UFs com acesso marítimo. Destinos fora desta lista exigem trecho terrestre final após cabotagem. */
 export const COASTAL_UFS: UF[] = [

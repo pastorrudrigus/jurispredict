@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Server } from "node:http";
-import { Client, PASSWORD, startServer } from "./helpers";
-import { hashPassword, verifyPassword } from "../server/auth";
-import type { Store } from "../server/store";
+import { Client, PASSWORD, startServer } from "./helpers.js";
+import { hashPassword, verifyPassword } from "../server/auth.js";
+import type { Store } from "../server/store.js";
 
 let server: Server;
 let base = "";

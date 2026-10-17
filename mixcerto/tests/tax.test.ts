@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   creditExampleScenario, creditSensitivity, DEFAULT_ORIGINS, DEFAULT_SCENARIO, defaultInterstateRate, destRateFor,
   simulateOrigin, simulateTax, type OriginProfile, type TaxScenario,
-} from "../shared/tax-simulator";
-import { presentValue } from "../shared/money";
+} from "../shared/tax-simulator.js";
+import { presentValue } from "../shared/money.js";
 
 const revenda: TaxScenario = { ...DEFAULT_SCENARIO, purpose: "revenda" };
 const mg = DEFAULT_ORIGINS.find((o) => o.uf === "MG")!;

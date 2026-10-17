@@ -1,8 +1,8 @@
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
-import { createApp } from "../server/app";
-import { createUser } from "../server/auth";
-import { Store } from "../server/store";
+import { createApp } from "../server/app.js";
+import { createUser } from "../server/auth.js";
+import { Store } from "../server/store.js";
 
 export const PASSWORD = "SenhaForte123";
 

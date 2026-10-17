@@ -13,12 +13,12 @@ import {
   type ProposalEvaluation,
   type RankedProposal,
   type TimelinePoint,
-} from "../../shared/competition";
-import { DEFAULT_DESTINATION, type AuditEvent, type LogisticsTerms } from "../../shared/contracts";
-import { validateLogistics } from "../../shared/transport";
-import { INITIAL_LOGISTICS } from "../seed";
-import type { Role } from "../../shared/auth";
-import { currentActor } from "../context";
+} from "../../shared/competition.js";
+import { DEFAULT_DESTINATION, type AuditEvent, type LogisticsTerms } from "../../shared/contracts.js";
+import { validateLogistics } from "../../shared/transport.js";
+import { INITIAL_LOGISTICS } from "../seed.js";
+import type { Role } from "../../shared/auth.js";
+import { currentActor } from "../context.js";
 
 export interface UserRecord {
   id: string;
@@ -61,8 +61,12 @@ export class DomainError extends Error {
 
 const dateOf = (now: string) => now.slice(0, 10);
 
+export const MAX_AUDIT = 5000;
+
 export function audit(db: Db, now: string, action: string, entity: string, detail: string, actor = currentActor()) {
   db.audit.push({ id: ++db.seq.audit, at: now, actor, action, entity, detail });
+  // Mantém o estado enxuto (uma linha JSONB): guarda os eventos mais recentes.
+  if (db.audit.length > MAX_AUDIT) db.audit.splice(0, db.audit.length - MAX_AUDIT);
 }
 
 export function getArena(db: Db, id: string): Arena {

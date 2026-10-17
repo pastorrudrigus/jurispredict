@@ -1,5 +1,5 @@
-import type { UF } from "./contracts";
-import { presentValue, toCents, type Cents } from "./money";
+import type { UF } from "./contracts.js";
+import { presentValue, toCents, type Cents } from "./money.js";
 
 /**
  * Simulador fiscal DIDÁTICO por cenário. Perfis de origem, preços, alíquotas, MVA e benefícios

@@ -1,5 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { computeBasket, evaluateProposal, rankProposals } from "../../shared/competition";
+import { computeBasket, evaluateProposal, rankProposals } from "../../shared/competition.js";
 import {
   audit,
   closeArena,
@@ -11,10 +11,10 @@ import {
   submitBid,
   updateLogistics,
   viewArena,
-} from "../domain/competition";
-import { INITIAL_LOGISTICS } from "../seed";
-import type { Store } from "../store";
-import { requirePermission } from "../auth";
+} from "../domain/competition.js";
+import { INITIAL_LOGISTICS } from "../seed.js";
+import type { Store } from "../store.js";
+import { requirePermission } from "../auth.js";
 
 type Handler = (req: Request, res: Response) => unknown;
 

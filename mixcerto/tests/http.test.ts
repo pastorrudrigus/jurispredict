@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Server } from "node:http";
-import { Client, startServer } from "./helpers";
+import { Client, startServer } from "./helpers.js";
 
 let server: Server;
 let base = "";
