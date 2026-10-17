@@ -14,3 +14,17 @@ services:
     envVars:
       - key: PORT
         value: 8000
+
+  # MixCerto - competicao do mix, inteligencia tributaria e transporte (Node)
+  - type: web
+    name: mixcerto
+    runtime: docker
+    plan: free
+    rootDir: mixcerto
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 3001

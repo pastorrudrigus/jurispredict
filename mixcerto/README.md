@@ -26,6 +26,12 @@ pnpm build && pnpm start
 
 Os dados ficam em `data/db.json` (ou no arquivo apontado por `MIXCERTO_DB`). Use **Catálogo → Restaurar demonstração** ou `POST /api/demo/reset` para voltar ao estado inicial.
 
+### Deploy no Render
+
+O `render.yaml` na raiz do repositório declara o serviço `mixcerto` (Docker, `rootDir: mixcerto`, health check em `/api/health`).
+No Render: **New + → Blueprint**, conecte o repositório e escolha a branch. O serviço sobe em `https://mixcerto-xxxx.onrender.com`.
+No plano gratuito o disco é efêmero: os dados de demonstração voltam ao estado inicial a cada reinício ou novo deploy.
+
 ### Testes e verificação
 
 ```bash
